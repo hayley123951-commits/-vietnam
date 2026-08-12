@@ -478,6 +478,7 @@ textarea.field{resize:none;line-height:1.5}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 /* ===== 設定：部署後只要改這一行 ===== */
+const SEED_VERSION="3";   // 改這個數字才會重新補預設地點
 const API_URL = "https://script.google.com/macros/s/AKfycbw5mf-rspOEO1aOe7dWHBqW1hgu8-NfwaqXXLURCzu1ybS3Rr0LaRY3siMNcdGzmEaE/exec";
 
 const TRIP = {
@@ -1422,13 +1423,21 @@ async function boot(){
     // 第一次連線、表是空的 → 自己把預設地點寫進去，不用使用者動手
     if(r&&r.ok&&!(r.places||[]).length){
       const w=await api("seedPlaces",{places:seedPlaceList()});
-      if(w&&w.ok) r=await api("load",{});
+      if(w&&w.ok){ await api("setConfig",{key:"seedVersion",value:SEED_VERSION}); r=await api("load",{}); }
       else console.warn("[初始化寫入失敗]",w);
     }
 
     if(r&&r.ok&&(r.places||[]).length){
-      const add=await api("seedMissing",{places:seedPlaceList()});
-      if(add&&add.ok&&add.n) r=await api("load",{});
+      // 只有版本對不上才動預設清單，避免每次開站都重複塞
+      if(r.seedVersion!==SEED_VERSION){
+        const d=await api("dedupe",{});
+        const add=await api("seedMissing",{places:seedPlaceList()});
+        await api("setConfig",{key:"seedVersion",value:SEED_VERSION});
+        if((d&&d.n)||(add&&add.n)){
+          r=await api("load",{});
+          if(d&&d.n) toast(`清掉了 ${d.n} 筆重複的地點`);
+        }
+      }
       applyLoad(r);
       backfillCoords();
     } else {
