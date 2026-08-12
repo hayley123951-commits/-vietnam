@@ -56,17 +56,17 @@ input,select,textarea{font-family:inherit;font-size:16px;color:inherit}
 .banner .who span{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--mute)}
 
 .status{
-  margin:14px 16px 0;padding:12px 13px;border:1px solid var(--sky);border-radius:4px;
-  background:var(--tint);font-size:12.5px;line-height:1.7;color:var(--blue-d);
+  display:flex;align-items:center;gap:8px;
+  padding:9px 16px;border-bottom:1px solid var(--line);
+  font-size:11.5px;color:var(--mute);line-height:1.5;
 }
-.status b{display:block;font-weight:600;margin-bottom:4px}
-.status code{
-  display:block;font-family:var(--mono);font-size:10.5px;color:var(--mute);
-  margin-top:7px;word-break:break-all;max-height:80px;overflow:auto;
+.status .dot{
+  width:5px;height:5px;border-radius:50%;background:var(--sky);flex:0 0 auto;
 }
+.status span{flex:1;min-width:0}
 .status button{
-  border:1px solid var(--blue);color:var(--blue);border-radius:3px;
-  padding:7px 13px;font-size:12px;min-height:34px;margin-top:10px;margin-right:6px;
+  flex:0 0 auto;color:var(--blue);font-size:11.5px;
+  border-bottom:1px dashed var(--sky);padding:1px 0;
 }
 @media (min-width:600px){ .status{max-width:560px;margin-left:auto;margin-right:auto} }
 .view{padding:18px 16px 6px}
@@ -486,41 +486,59 @@ function resort(){
   renderList(); toast("重新照票數排好了");
 }
 
-/* JSONP：用 <script> 標籤取資料，完全繞過跨網域限制。
-   給 LINE、IG 這類 App 內建瀏覽器用的備援路線。 */
+/* JSONP：用 <script> 標籤取資料，不受跨網域規則影響，任何瀏覽器都能通。
+   這是主要路線；只有夾帶截圖這種大資料才改走 POST。 */
 function jsonp(action,payload){
   return new Promise(resolve=>{
     const cb="cb"+Math.random().toString(36).slice(2,9);
     const url=API_URL+"?action="+encodeURIComponent(action)+
               "&payload="+encodeURIComponent(JSON.stringify(payload||{}))+
               "&callback="+cb;
-    if(url.length>6000) return resolve({ok:false,error:"資料太大，這個瀏覽器送不出去"});
+    if(url.length>7000) return resolve({ok:false,error:"資料太大"});
     const s=document.createElement("script");
-    const timer=setTimeout(()=>{done({ok:false,error:"後端沒有回應（逾時）"})},25000);
+    const timer=setTimeout(()=>done({ok:false,error:"逾時"}),25000);
     function done(v){ clearTimeout(timer); delete window[cb]; s.remove(); resolve(v) }
     window[cb]=v=>done(v);
-    s.onerror=()=>done({ok:false,error:"連不上後端"});
+    s.onerror=()=>done({ok:false,error:"載入失敗"});
     s.src=url;
     document.head.appendChild(s);
   });
 }
 
-async function api(action,payload){
-  if(!API_URL) return null;
-  const body=JSON.stringify({action,payload});
-
-  // 先走 POST；通的話最快也沒有長度限制
+async function post(action,payload){
   try{
     const res=await fetch(API_URL,{method:"POST",
-      headers:{"Content-Type":"text/plain;charset=utf-8"},body});
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({action,payload})});
     const txt=await res.text();
-    try{ return JSON.parse(txt) }catch(_){ /* 回了 HTML，往下走備援 */ }
-  }catch(e){ /* 被瀏覽器擋掉，往下走備援 */ }
+    let j;
+    try{ j=JSON.parse(txt) }
+    catch(_){
+      console.warn("[後端回了 HTML]", txt.slice(0,400));
+      return {ok:false,error:"後端沒有回傳資料"};
+    }
+    // 只回健康檢查訊息 = 部署的版本是舊的
+    if(j&&j.msg&&j.places===undefined&&action==="load")
+      return {ok:false,error:"後端版本是舊的，請到 Apps Script 重新部署"};
+    return j;
+  }catch(e){
+    console.warn("[POST 失敗]", e);
+    return {ok:false,error:"連不上後端"};
+  }
+}
 
-  // POST 走不通 → 改用 JSONP
-  const r=await jsonp(action,payload);
-  if(r&&r.ok) return r;
-  return r||{ok:false,error:"連不上後端。"};
+async function api(action,payload){
+  if(!API_URL) return null;
+  let a=null;
+  if(JSON.stringify(payload||{}).length<4000){
+    a=await jsonp(action,payload);
+    if(a&&a.ok) return a;
+  }
+  const b=await post(action,payload);
+  if(b&&b.ok) return b;
+  const r=a||b||{ok:false,error:"連不上後端"};
+  console.warn("[api 失敗]",action,r);
+  return r;
 }
 
 
@@ -596,13 +614,12 @@ function demoSeed(){
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-function status(title,body,detail,actions){
+function status(msg){
   const el=$("#statusBar");
-  if(!title){ el.classList.add("hide"); el.innerHTML=""; return }
+  if(!msg){ el.classList.add("hide"); el.innerHTML=""; return }
   el.classList.remove("hide");
-  el.innerHTML=`<b>${esc(title)}</b>${esc(body||"")}`+
-    (detail?`<code>${esc(detail)}</code>`:"")+
-    (actions||[]).map(a=>`<button data-act="${a.k}">${esc(a.t)}</button>`).join("");
+  el.innerHTML=`<i class="dot"></i><span>${esc(msg)}</span>`+
+               `<button data-act="retry">重新連線</button>`;
 }
 function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove("on"),2200)}
 const scoreOf=id=>Object.values(state.votes[id]||{}).reduce((a,b)=>a+b,0);
@@ -682,7 +699,7 @@ function renderList(){
   $("#listBody").innerHTML = rows.length ? rows.map(p=>cardHTML(p,false)).join("")
     : `<div class="empty"><b>清單是空的</b>
         <p>去 Google 地圖找一家店，按分享、複製連結，<br>回來按右下角的新增貼進去。</p>
-        ${API_URL?`<button class="lockbtn" data-act="seed">把預設的 21 個地點寫進去</button>`:""}</div>`;
+</div>`;
   fetchBriefs();
 }
 
@@ -938,12 +955,7 @@ document.addEventListener("click",async e=>{
     return;
   }
   const act=e.target.closest("[data-act]");
-  if(act){
-    if(act.dataset.act==="retry"){ status(null); boot(); }
-    if(act.dataset.act==="seed")  doSeed();
-    if(act.dataset.act==="demo"){ status(null); demoSeed(); ensureOrder(); renderAll(); }
-    return;
-  }
+  if(act){ if(act.dataset.act==="retry") boot(); return; }
   const chip=e.target.closest(".chip");
   if(chip){ filterCat=chip.dataset.cat; renderList(); return; }
   const dt=e.target.closest(".daytab");
@@ -1187,23 +1199,6 @@ function enter(m){
   renderAll();
 }
 
-async function doSeed(){
-  status("正在寫入…","把 21 個地點送進試算表，稍等一下。");
-  const w=await api("seedPlaces",{places:seedPlaceList()});
-  if(w&&w.ok){
-    status(null);
-    const r=await api("load",{});
-    if(r&&r.ok) applyLoad(r);
-    ensureOrder(); state.order.sort((a,b)=>scoreOf(b)-scoreOf(a));
-    renderAll(); backfillCoords();
-    toast(`寫進去 ${w.n} 個地點`);
-  }else{
-    status("寫不進去", (w&&w.error)||"後端沒有回應。",
-      (w&&w.detail)||"",
-      [{k:"retry",t:"重試"}]);
-  }
-}
-
 function applyLoad(r){
   state.members=r.members||[]; state.places=r.places||[]; state.votes=r.votes||{};
   state.expenses=r.expenses||[]; state.hotel=r.hotel||null; state.rate=r.rate||800;
@@ -1211,26 +1206,23 @@ function applyLoad(r){
 }
 
 async function boot(){
+  status(null);
   if(API_URL){
-    const r=await api("load",{});
+    let r=await api("load",{});
 
-    if(!r||!r.ok){
-      status("連不上你的試算表",
-        ((r&&r.error)||"沒有拿到回應。")+
-        " 如果你是從 LINE 或 IG 裡面點開的，請按右下角「⋯」選用 Safari 或 Chrome 開啟。",
-        (r&&r.detail)||"",
-        [{k:"retry",t:"重試"},{k:"demo",t:"先看離線範例"}]);
-      demoSeed();
-    } else {
+    // 第一次連線、表是空的 → 自己把預設地點寫進去，不用使用者動手
+    if(r&&r.ok&&!(r.places||[]).length){
+      const w=await api("seedPlaces",{places:seedPlaceList()});
+      if(w&&w.ok) r=await api("load",{});
+      else console.warn("[初始化寫入失敗]",w);
+    }
+
+    if(r&&r.ok&&(r.places||[]).length){
       applyLoad(r);
-      if(!state.places.length){
-        status("試算表連上了，但裡面還沒有地點",
-          "按下面的按鈕就會把預設的 21 個地點寫進去。",
-          "", [{k:"seed",t:"現在寫入"}]);
-      } else {
-        status(null);
-        backfillCoords();
-      }
+      backfillCoords();
+    } else {
+      demoSeed();
+      status("還沒連上共用清單，現在看到的是範例資料");
     }
   } else demoSeed();
 
