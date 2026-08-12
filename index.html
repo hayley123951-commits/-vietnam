@@ -478,7 +478,9 @@ textarea.field{resize:none;line-height:1.5}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 /* ===== 設定：部署後只要改這一行 ===== */
-const SEED_VERSION="3";   // 改這個數字才會重新補預設地點
+const SEED_VERSION="4";   // 改這個數字才會重新整理預設地點
+/* 早期我先放的暫代飯店，版本更新時一併移除 */
+const RETIRED=["Hôtel des Arts Saigon","Fusion Originals Saigon Centre","The Myst Đồng Khởi"];
 const API_URL = "https://script.google.com/macros/s/AKfycbw5mf-rspOEO1aOe7dWHBqW1hgu8-NfwaqXXLURCzu1ybS3Rr0LaRY3siMNcdGzmEaE/exec";
 
 const TRIP = {
@@ -530,6 +532,7 @@ const MEMBERS=[
   {id:"u-pin",   name:"品欣"}
 ];
 /* 行程四天的點點顏色（由深到淺再到黑） */
+
 const DAYCOLOR=["#33507A","#4C70A2","#8EABD5","#0A0B0D"];
 
 const mem={};
@@ -643,12 +646,6 @@ function seedPlaceList(){
     Object.assign(P("M Village 快捷 Nguyen Du","住宿",null,null,"小劉","Modern Village Lifestyle 品牌",""),
       {perNight:1801,rooms:3,nights:3}),
 
-    P("Hôtel des Arts Saigon","住宿",10.7845,106.6890,"","第三郡，有頂樓泳池",
-      "第三郡的藝術主題飯店，房間偏復古殖民風，頂樓泳池與酒吧評價好。到第一郡景點約 10 分鐘車程。"),
-    P("Fusion Originals Saigon Centre","住宿",10.7760,106.7000,"","位置最中間",
-      "第一郡正中心，走路就能到濱城市場與阮惠步行街。房型簡潔實用，含早餐。"),
-    P("The Myst Đồng Khởi","住宿",10.7790,106.7050,"","靠河岸",
-      "同起街一帶的設計型飯店，靠近西貢河，有頂樓泳池。價位比前兩間高一些。"),
 
     // ↓ 你的收藏連結。名稱先用你給的標籤，接上後端後會自動換成真實店名與座標
     L("化妝室","體驗","https://maps.app.goo.gl/1h6QWqge3aKZ6v1F9"),
@@ -723,6 +720,36 @@ const gmapLink=p=>p.url||`https://www.google.com/maps/search/?api=1&query=${enco
 
 /* ===== 清單 ===== */
 /* 「07:00-22:00」這種格式才解析得出來，其他就純文字顯示 */
+/* 訂房網址裡帶得到的東西：入住／退房日、晚數、間數、飯店代稱。
+   價格抓不到 —— 那是頁面載入後才由 JS 算出來的。 */
+function parseBookingUrl(u){
+  let q; try{ q=new URL(u) }catch(e){ return null }
+  const g=k=>q.searchParams.get(k);
+  const out={rooms:null,nights:null,name:"",checkin:""};
+
+  const ci=g("checkin")||g("checkIn")||g("checkin_date")||g("cd");
+  const co=g("checkout")||g("checkOut")||g("checkout_date");
+  if(ci&&/^\d{4}-\d{2}-\d{2}$/.test(ci)){
+    out.checkin=ci;
+    if(co&&/^\d{4}-\d{2}-\d{2}$/.test(co)){
+      const n=Math.round((new Date(co)-new Date(ci))/86400000);
+      if(n>0&&n<60) out.nights=n;
+    }
+  }
+  const los=+(g("los")||g("nights")||0);
+  if(!out.nights&&los>0&&los<60) out.nights=los;
+
+  const rm=+(g("no_rooms")||g("rooms")||g("numberOfRooms")||g("roomCount")||0);
+  if(rm>0&&rm<20) out.rooms=rm;
+
+  const m=q.pathname.match(/\/hotel\/[a-z]{2}\/([^.\/]+)/i);
+  if(m){ try{
+    out.name=decodeURIComponent(m[1]).replace(/[-_]+/g," ")
+      .replace(/\b\w/g,c=>c.toUpperCase()).trim();
+  }catch(e){} }
+  return out;
+}
+
 function parseHours(s){
   const m=String(s||"").match(/(\d{1,2})\s*[:：]\s*(\d{2})\s*[-–—~〜～－ー到至]\s*(\d{1,2})\s*[:：]\s*(\d{2})/);
   if(!m) return null;
@@ -742,6 +769,41 @@ function refRow(p){
   if(!ls.length) return "";
   return `<div class="reflinks">${ls.map(u=>
     `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(hostOf(u))}</a>`).join("")}</div>`;
+}
+
+/* 訂房網址裡明碼寫著日期、間數、飯店名稱 —— 純字串解析，不用連線也不會被擋。
+   價格抓不到（動態產生且會擋機器人），那格還是要自己填。 */
+function parseBooking(u){
+  let q; try{ q=new URL(u) }catch(e){ return null }
+  const host=q.hostname.replace(/^www\./,"");
+  const g=k=>q.searchParams.get(k);
+  const out={name:"",rooms:null,nights:null,host};
+  const title=s=>s.replace(/[-_+]+/g," ").trim()
+                  .replace(/\s+/g," ").replace(/\b\w/g,c=>c.toUpperCase());
+
+  const ci=g("checkin")||g("checkIn")||g("checkInDate")||g("startDate");
+  const co=g("checkout")||g("checkOut")||g("checkOutDate")||g("endDate");
+  if(ci&&co){
+    const d=(new Date(co)-new Date(ci))/86400000;
+    if(d>0&&d<60) out.nights=Math.round(d);
+  }
+  const los=g("los")||g("LengthOfStay")||g("nights");
+  if(!out.nights&&los&&+los>0&&+los<60) out.nights=+los;
+
+  const rooms=g("no_rooms")||g("rooms")||g("NumberOfRooms")||g("roomCount");
+  if(rooms&&+rooms>0&&+rooms<20) out.rooms=+rooms;
+
+  let m;
+  if(/booking\.com/.test(host)){
+    m=q.pathname.match(/\/hotel\/[a-z]{2}\/([^\/.]+)/i);
+    if(m) out.name=title(m[1]);
+  } else if(/agoda\./.test(host)){
+    m=q.pathname.match(/^\/([^\/]+)\/hotel\//i) || q.pathname.match(/\/hotel\/([^\/.]+)/i);
+    if(m&&!/^zh-|^en-|^th-/.test(m[1])) out.name=title(m[1].replace(/-hotel$/i,""));
+  } else if(/hotels\.com|expedia\./.test(host)){
+    m=q.pathname.match(/\/ho\d+|\/h\d+/);
+  }
+  return out;
 }
 
 function priceLine(p){
@@ -1228,8 +1290,42 @@ function updateTwdHint(){
 
 /* ---- 新增地點 ---- */
 let pickedCat="",shotData="",parsed={},editingId=null;
+/* 訂房網址通常帶著入住日、退房日、房間數，解出來自動填 */
+function parseBooking(url){
+  try{
+    const q=new URL(url).searchParams;
+    const g=(...k)=>{ for(const x of k){ const v=q.get(x); if(v) return v } return null };
+    const ci=g("checkin","checkIn","checkInDate","checkin_date","ci","startDate");
+    const co=g("checkout","checkOut","checkOutDate","checkout_date","co","endDate");
+    const rooms=+(g("no_rooms","rooms","numberOfRooms","roomCount","adults_rooms")||0);
+    let nights=0;
+    if(ci&&co){
+      const a=new Date(ci), b=new Date(co);
+      if(!isNaN(a)&&!isNaN(b)) nights=Math.round((b-a)/86400000);
+    }
+    return {rooms:rooms>0?rooms:0, nights:nights>0?nights:0};
+  }catch(e){ return {rooms:0,nights:0} }
+}
+
 const collectLinks=()=>["#linkIn1","#linkIn2","#linkIn3"]
   .map(s=>$(s).value.trim()).filter(Boolean).join("\n");
+
+/* 貼訂房網址時，把網址裡有的資訊自動填進空欄位 */
+["#linkIn1","#linkIn2","#linkIn3"].forEach(sel=>{
+  document.addEventListener("input",e=>{
+    if(e.target!==$(sel)) return;
+    const b=parseBooking(e.target.value.trim());
+    if(!b) return;
+    let got=[];
+    if(b.nights&&!$("#nightsIn").value){ $("#nightsIn").value=b.nights; got.push(`${b.nights} 晚`) }
+    if(b.rooms &&!$("#roomsIn").value ){ $("#roomsIn").value =b.rooms;  got.push(`${b.rooms} 間`) }
+    if(b.name  &&!$("#nameIn").value  ){ $("#nameIn").value  =b.name;   got.push("飯店名稱") }
+    if(got.length){
+      toast("從網址帶出：" + got.join("、"));
+      $("#priceHint").textContent="價格訂房網不給抓，那格請自己填。";
+    }
+  });
+});
 $("#fab").onclick=()=>{ curView==="cost" ? openCost() : openPlace() };
 function openPlace(id){
   editingId=id||null;
@@ -1281,6 +1377,13 @@ $("#catPick").addEventListener("click",e=>{
   $("#priceBox").classList.toggle("hide", pickedCat!=="住宿");
 });
 document.addEventListener("input",e=>{
+  if(["linkIn1","linkIn2","linkIn3"].indexOf(e.target.id)>=0 && pickedCat==="住宿"){
+    const b=parseBooking(e.target.value.trim());
+    if(b.rooms && !$("#roomsIn").value)  $("#roomsIn").value=b.rooms;
+    if(b.nights && !$("#nightsIn").value) $("#nightsIn").value=b.nights;
+    if(b.rooms||b.nights) $("#priceHint").textContent=
+      `從訂房連結讀到 ${b.rooms?b.rooms+" 間 ":""}${b.nights?b.nights+" 晚":""}，只要再填單價`;
+  }
   if(["perNightIn","roomsIn","nightsIn"].indexOf(e.target.id)<0) return;
   const per=+$("#perNightIn").value, rm=+$("#roomsIn").value, nt=+$("#nightsIn").value;
   $("#priceHint").textContent = (per&&rm&&nt)
@@ -1345,7 +1448,8 @@ $("#saveBtn").onclick=async()=>{
            by:state.me.name,note:$("#noteIn").value.trim(),hours:$("#hoursIn").value.trim(),link:collectLinks(),
            perNight:+$("#perNightIn").value||"", rooms:+$("#roomsIn").value||"", nights:+$("#nightsIn").value||"",
            shot:shotData,brief:""};
-  state.places.unshift(p); state.votes[p.id]={[state.me.id]:2};
+  // 自己丟的預設投「一定要去」；住宿只有兩檔，投「要」
+  state.places.unshift(p); state.votes[p.id]={[state.me.id]: pickedCat==="住宿"?1:3};
   api("addPlace",{place:p,memberId:state.me.id});
   b.disabled=false; b.textContent="加進清單";
   closeSheets(); renderAll();
@@ -1430,10 +1534,12 @@ async function boot(){
     if(r&&r.ok&&(r.places||[]).length){
       // 只有版本對不上才動預設清單，避免每次開站都重複塞
       if(r.seedVersion!==SEED_VERSION){
+        await api("retirePlaces",{names:RETIRED});
         const d=await api("dedupe",{});
+        const rm=await api("removePlaces",{names:RETIRED});
         const add=await api("seedMissing",{places:seedPlaceList()});
         await api("setConfig",{key:"seedVersion",value:SEED_VERSION});
-        if((d&&d.n)||(add&&add.n)){
+        if((d&&d.n)||(rm&&rm.n)||(add&&add.n)){
           r=await api("load",{});
           if(d&&d.n) toast(`清掉了 ${d.n} 筆重複的地點`);
         }
