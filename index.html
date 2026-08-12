@@ -292,6 +292,19 @@ textarea.field{resize:none;line-height:1.5}
   display:block;font-style:normal;font-family:var(--mono);font-size:9.5px;
   letter-spacing:.06em;color:var(--mute);text-align:center;margin-top:4px;
 }
+.hours{
+  padding:0 14px 10px;font-family:var(--mono);font-size:11.5px;
+  letter-spacing:.03em;color:var(--mute);
+}
+.warn{
+  display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+  color:#B4541F;border:1px solid #E0B08A;border-radius:2px;padding:2px 6px;
+}
+.reflinks{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 12px}
+.reflinks a{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.03em;color:var(--blue);
+  border:1px solid var(--sky);border-radius:2px;padding:4px 8px;text-decoration:none;
+}
 .price{
   padding:0 14px 11px;font-family:var(--mono);font-size:12px;color:var(--blue-d);
 }
@@ -409,11 +422,17 @@ textarea.field{resize:none;line-height:1.5}
   <div class="hint" id="urlHint">貼上後會自動帶出名稱與座標。</div>
   <label class="fl lbl" for="nameIn">名稱</label>
   <input class="field" id="nameIn" placeholder="Bánh Mì Huỳnh Hoa" autocomplete="off">
+  <label class="fl lbl" for="hoursIn">營業時間（可留白）</label>
+  <input class="field" id="hoursIn" placeholder="07:00–22:00　或　週一公休" autocomplete="off" maxlength="40">
+  <div class="hint">打成 <b>07:00–22:00</b> 這種格式的話，排行程時會自動幫你檢查時段對不對得上。</div>
+
   <label class="fl lbl" for="noteIn">補一句</label>
   <input class="field" id="noteIn" placeholder="聽說要早點去不然賣完" autocomplete="off" maxlength="40">
 
-  <label class="fl lbl" for="linkIn">參考連結（IG、部落格、訂房網⋯）</label>
-  <input class="field" id="linkIn" placeholder="https://…" autocomplete="off" inputmode="url">
+  <label class="fl lbl">參考連結（IG、部落格、訂房網⋯，最多三個，可以留白）</label>
+  <input class="field" id="linkIn1" placeholder="https://…" autocomplete="off" inputmode="url">
+  <input class="field" id="linkIn2" placeholder="https://…" autocomplete="off" inputmode="url" style="margin-top:6px">
+  <input class="field" id="linkIn3" placeholder="https://…" autocomplete="off" inputmode="url" style="margin-top:6px">
 
   <div id="priceBox" class="hide">
     <label class="fl lbl">房價（住宿才要填）</label>
@@ -592,11 +611,11 @@ async function api(action,payload){
 function seedPlaceList(){
   const P=(name,cat,lat,lng,by,note,brief)=>({
     id:"d"+Math.random().toString(36).slice(2,8),name,cat,lat,lng,by,note,brief,
-    url:"",link:"",shot:"",perNight:"",rooms:"",nights:""});
+    url:"",link:"",shot:"",hours:"",perNight:"",rooms:"",nights:""});
   // note 是小劉自己標的補充；name 接上後端展開後會換成 Google 地圖上的店名
   const L=(label,cat,url)=>({
     id:"d"+Math.random().toString(36).slice(2,8),name:label,cat,lat:null,lng:null,
-    by:"小劉",note:label,brief:"",url,link:"",shot:"",perNight:"",rooms:"",nights:""});
+    by:"小劉",note:label,brief:"",url,link:"",shot:"",hours:"",perNight:"",rooms:"",nights:""});
   const PLACES=[
     P("濱城市場 Chợ Bến Thành","購物",10.7725,106.6980,"","記得殺價",
       "第一郡地標市場，日間賣乾貨、咖啡與紀念品，開價通常要對半砍。周邊夜市晚上才開。"),
@@ -702,6 +721,28 @@ function parseMapsUrl(url){
 const gmapLink=p=>p.url||`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name)}`;
 
 /* ===== 清單 ===== */
+/* 「07:00-22:00」這種格式才解析得出來，其他就純文字顯示 */
+function parseHours(s){
+  const m=String(s||"").match(/(\d{1,2})\s*[:：]\s*(\d{2})\s*[-–—~〜～－ー到至]\s*(\d{1,2})\s*[:：]\s*(\d{2})/);
+  if(!m) return null;
+  let open=+m[1]*60 + +m[2], close=+m[3]*60 + +m[4];
+  if(close<=open) close+=1440;          // 跨午夜
+  return {open,close};
+}
+function hoursLine(p){
+  if(!p.hours) return "";
+  return `<div class="hours">${esc(p.hours)}</div>`;
+}
+
+const linksOf=p=>String(p.link||"").split(/[\n|]+/).map(s=>s.trim()).filter(Boolean);
+function hostOf(u){ try{ return new URL(u).hostname.replace(/^www\./,"") }catch(e){ return "連結" } }
+function refRow(p){
+  const ls=linksOf(p);
+  if(!ls.length) return "";
+  return `<div class="reflinks">${ls.map(u=>
+    `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(hostOf(u))}</a>`).join("")}</div>`;
+}
+
 function priceLine(p){
   const per=+p.perNight||0, rm=+p.rooms||0, nt=+p.nights||0;
   if(!(per&&rm&&nt)) return "";
@@ -721,9 +762,10 @@ function cardHTML(p,stay){
           p.by?`<span class="by">${esc(p.by)} 丟的</span>`:""}</div></div>
       <div class="sc ${s===0?"z":""}"><b>${s}</b></div>
     </div>
-    ${p.brief?`<div class="brief"><span class="lbl">參考介紹</span>${esc(p.brief)}</div>`
-             :`<div class="brief load" data-brief="${p.id}"><span class="lbl">參考介紹</span>整理中…</div>`}
+    ${p.brief?`<div class="brief"><span class="lbl">參考介紹</span>${esc(p.brief)}</div>`:""}
+    ${hoursLine(p)}
     ${priceLine(p)}
+    ${refRow(p)}
     ${p.note?`<div class="note">「${esc(p.note)}」</div>`:""}
     <div class="vote${stay?" two":""}" data-id="${p.id}">
       ${(stay?VOTE_STAY:VOTE_NORMAL).map(o=>
@@ -734,7 +776,6 @@ function cardHTML(p,stay){
     <div class="links">
       <button data-edit="${p.id}">編輯</button>
       <a href="${gmapLink(p)}" target="_blank" rel="noopener">Google 地圖</a>
-      ${p.link?`<a href="${esc(p.link)}" target="_blank" rel="noopener">參考連結</a>`:""}
       <button class="g" data-del="${p.id}">刪掉</button>
     </div></article>`;
 }
@@ -794,17 +835,17 @@ function refreshCard(id){
   sc.classList.toggle("z", s===0);
 }
 
-let briefBusy=false;
+/* 背景補介紹：拿不到就算了，畫面上不留任何痕跡 */
+let briefBusy=false, briefFailed={};
 async function fetchBriefs(){
   if(!API_URL||briefBusy) return;
-  const el=document.querySelector("[data-brief]"); if(!el) return;
-  const p=state.places.find(x=>x.id===el.dataset.brief); if(!p) return;
+  const p=state.places.find(x=>!x.brief&&!briefFailed[x.id]);
+  if(!p) return;
   briefBusy=true;
   const r=await api("brief",{id:p.id,name:p.name,cat:p.cat});
   briefBusy=false;
   if(r&&r.ok&&r.text){ p.brief=r.text; renderList(); }
-  else if(el.isConnected){ el.classList.remove("load");
-    el.innerHTML=`<span class="lbl">參考介紹</span>沒拿到介紹，可以點下面的 Google 地圖看評論。`; }
+  else briefFailed[p.id]=1;
 }
 
 /* ===== 地圖 ===== */
@@ -920,6 +961,16 @@ function buildPlan(){
   });
 }
 
+/* 排定的時段落在營業時間外就提醒 */
+function hoursWarn(s){
+  const hh=parseHours(s.hours); if(!hh) return "";
+  const at=toMin(s.at), dur=catOf(s.cat).mins;
+  if(at<hh.open)  return `這時間還沒開（${String(Math.floor(hh.open/60)).padStart(2,"0")}:${String(hh.open%60).padStart(2,"0")} 才開）`;
+  if(at>=hh.close) return "這時間已經打烊了";
+  if(at+dur>hh.close) return "待到一半就打烊了";
+  return "";
+}
+
 let planDay=0;
 function renderPlan(){
   const plan=buildPlan(), h=state.places.find(p=>p.id===state.hotel);
@@ -952,10 +1003,13 @@ function renderPlan(){
         <button class="xbtn" data-rm="${s.slot}">×</button></div>`;
       return;
     }
+    const hw=hoursWarn(s);
     html+=`<div class="stub">${time}
       <div class="n">${esc(s.name)}</div>
       <div class="m"><span class="tag">${s.cat}</span><span>${s.s} 分</span>
+      ${s.hours?`<span>${esc(s.hours)}</span>`:""}
       ${s.note?`<span>· ${esc(s.note)}</span>`:""}</div>
+      ${hw?`<div style="margin-top:7px"><span class="warn">${esc(hw)}</span></div>`:""}
       <button class="xbtn" data-rm="${s.slot}">×</button></div>`;
   });
 
@@ -1173,6 +1227,8 @@ function updateTwdHint(){
 
 /* ---- 新增地點 ---- */
 let pickedCat="",shotData="",parsed={},editingId=null;
+const collectLinks=()=>["#linkIn1","#linkIn2","#linkIn3"]
+  .map(s=>$(s).value.trim()).filter(Boolean).join("\n");
 $("#fab").onclick=()=>{ curView==="cost" ? openCost() : openPlace() };
 function openPlace(id){
   editingId=id||null;
@@ -1188,7 +1244,9 @@ function openPlace(id){
     $("#urlIn").value=p.url||"";
     $("#nameIn").value=p.name||"";
     $("#noteIn").value=p.note||"";
-    $("#linkIn").value=p.link||"";
+    $("#hoursIn").value=p.hours||"";
+    const ls=linksOf(p);
+    $("#linkIn1").value=ls[0]||""; $("#linkIn2").value=ls[1]||""; $("#linkIn3").value=ls[2]||"";
     $("#perNightIn").value=p.perNight||""; $("#roomsIn").value=p.rooms||""; $("#nightsIn").value=p.nights||"";
     $("#priceBox").classList.toggle("hide", p.cat!=="住宿");
     shotData=p.shot||"";
@@ -1203,8 +1261,8 @@ function openPlace(id){
 function closeSheets(){
   $("#scrim").classList.remove("on");
   $("#sheet").classList.remove("on"); $("#csheet").classList.remove("on");
-  ["#urlIn","#nameIn","#noteIn","#linkIn","#perNightIn","#roomsIn","#nightsIn",
-   "#expTitle","#expAmt"].forEach(s=>$(s).value="");
+  ["#urlIn","#nameIn","#noteIn","#hoursIn","#linkIn1","#linkIn2","#linkIn3",
+   "#perNightIn","#roomsIn","#nightsIn","#expTitle","#expAmt"].forEach(s=>$(s).value="");
   $("#priceBox").classList.add("hide"); $("#priceHint").textContent="";
   $("#shotIn").value=""; $("#shotPrev").classList.add("hide"); $("#expTwd").textContent="";
   $("#urlHint").className="hint"; $("#urlHint").textContent="貼上後會自動帶出名稱與座標。";
@@ -1268,9 +1326,9 @@ $("#saveBtn").onclick=async()=>{
     if(url&&url!==p.url&&lat===null&&API_URL){
       const r=await api("resolve",{url}); if(r&&r.ok){lat=r.lat;lng=r.lng}
     }
-    if(p.name!==name) p.brief="";            // 換了名字就重新產介紹
+    if(p.name!==name){ p.brief=""; delete briefFailed[p.id] }   // 換了名字就重新產介紹
     Object.assign(p,{name,cat:pickedCat,url,lat,lng,
-      note:$("#noteIn").value.trim(), link:$("#linkIn").value.trim(),
+      note:$("#noteIn").value.trim(), hours:$("#hoursIn").value.trim(), link:collectLinks(),
       perNight:+$("#perNightIn").value||"", rooms:+$("#roomsIn").value||"", nights:+$("#nightsIn").value||"",
       shot:shotData});
     api("updatePlace",{place:p});
@@ -1283,7 +1341,7 @@ $("#saveBtn").onclick=async()=>{
   const url=$("#urlIn").value.trim();
   if(url&&lat===null&&API_URL){ const r=await api("resolve",{url}); if(r&&r.ok){lat=r.lat;lng=r.lng} }
   const p={id:"p"+Date.now().toString(36),name,cat:pickedCat,lat,lng,url,
-           by:state.me.name,note:$("#noteIn").value.trim(),link:$("#linkIn").value.trim(),
+           by:state.me.name,note:$("#noteIn").value.trim(),hours:$("#hoursIn").value.trim(),link:collectLinks(),
            perNight:+$("#perNightIn").value||"", rooms:+$("#roomsIn").value||"", nights:+$("#nightsIn").value||"",
            shot:shotData,brief:""};
   state.places.unshift(p); state.votes[p.id]={[state.me.id]:2};
