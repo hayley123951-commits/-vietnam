@@ -486,26 +486,43 @@ function resort(){
   renderList(); toast("重新照票數排好了");
 }
 
+/* JSONP：用 <script> 標籤取資料，完全繞過跨網域限制。
+   給 LINE、IG 這類 App 內建瀏覽器用的備援路線。 */
+function jsonp(action,payload){
+  return new Promise(resolve=>{
+    const cb="cb"+Math.random().toString(36).slice(2,9);
+    const url=API_URL+"?action="+encodeURIComponent(action)+
+              "&payload="+encodeURIComponent(JSON.stringify(payload||{}))+
+              "&callback="+cb;
+    if(url.length>6000) return resolve({ok:false,error:"資料太大，這個瀏覽器送不出去"});
+    const s=document.createElement("script");
+    const timer=setTimeout(()=>{done({ok:false,error:"後端沒有回應（逾時）"})},25000);
+    function done(v){ clearTimeout(timer); delete window[cb]; s.remove(); resolve(v) }
+    window[cb]=v=>done(v);
+    s.onerror=()=>done({ok:false,error:"連不上後端"});
+    s.src=url;
+    document.head.appendChild(s);
+  });
+}
+
 async function api(action,payload){
   if(!API_URL) return null;
-  let res;
+  const body=JSON.stringify({action,payload});
+
+  // 先走 POST；通的話最快也沒有長度限制
   try{
-    res=await fetch(API_URL,{method:"POST",
-      headers:{"Content-Type":"text/plain;charset=utf-8"},
-      body:JSON.stringify({action,payload})});
-  }catch(e){
-    return {ok:false,error:"連不上後端。多半是部署的「誰可以存取」沒設成『所有人』，或網址貼錯。",detail:String(e)};
-  }
-  const txt=await res.text();
-  try{ return JSON.parse(txt) }
-  catch(e){
-    const login=/accounts\.google\.com|需要存取權|Sign in/i.test(txt);
-    return {ok:false,
-      error: login ? "後端把你導去 Google 登入頁了。部署時的「誰可以存取」要選『所有人』。"
-                   : "後端回的不是 JSON，通常代表 Apps Script 執行時出錯了。",
-      detail: txt.slice(0,300)};
-  }
+    const res=await fetch(API_URL,{method:"POST",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},body});
+    const txt=await res.text();
+    try{ return JSON.parse(txt) }catch(_){ /* 回了 HTML，往下走備援 */ }
+  }catch(e){ /* 被瀏覽器擋掉，往下走備援 */ }
+
+  // POST 走不通 → 改用 JSONP
+  const r=await jsonp(action,payload);
+  if(r&&r.ok) return r;
+  return r||{ok:false,error:"連不上後端。"};
 }
+
 
 /* ===== 地點清單：離線預覽與第一次連線寫入試算表共用 ===== */
 function seedPlaceList(){
@@ -1199,7 +1216,8 @@ async function boot(){
 
     if(!r||!r.ok){
       status("連不上你的試算表",
-        (r&&r.error)||"沒有拿到回應。",
+        ((r&&r.error)||"沒有拿到回應。")+
+        " 如果你是從 LINE 或 IG 裡面點開的，請按右下角「⋯」選用 Safari 或 Chrome 開啟。",
         (r&&r.detail)||"",
         [{k:"retry",t:"重試"},{k:"demo",t:"先看離線範例"}]);
       demoSeed();
