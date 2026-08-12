@@ -287,9 +287,24 @@ label.fl{display:block;margin:16px 0 7px}
 }
 .field:focus{outline:1.5px solid var(--blue);border-color:transparent}
 textarea.field{resize:none;line-height:1.5}
+.price3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.price3 em{
+  display:block;font-style:normal;font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.06em;color:var(--mute);text-align:center;margin-top:4px;
+}
+.price{
+  padding:0 14px 11px;font-family:var(--mono);font-size:12px;color:var(--blue-d);
+}
+.price b{font-weight:600}
+.price span{color:var(--mute);font-size:11px}
 .cats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .catbtn{border:1px solid var(--line);border-radius:3px;padding:11px 2px;text-align:center;min-height:46px;font-size:12.5px;color:var(--mute)}
 .catbtn[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.seg2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.seg2 button{border:1px solid var(--line);border-radius:3px;padding:10px;font-size:12.5px;color:var(--mute);min-height:42px}
+.seg2 button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.settled{opacity:.45}
+.settled .ttl{text-decoration:line-through}
 .people{display:flex;flex-wrap:wrap;gap:6px}
 .pbtn{border:1px solid var(--line);border-radius:3px;padding:8px 13px;font-size:13px;color:var(--mute);min-height:38px}
 .pbtn[aria-pressed="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
@@ -312,8 +327,12 @@ textarea.field{resize:none;line-height:1.5}
 }
 .gate .dt{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--mute);margin-top:16px}
 .gate p{font-size:13.5px;color:var(--mute);line-height:1.85;margin:28px 0 4px;max-width:23em}
-.claim{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
-.claim button{border:1px solid var(--line);border-radius:3px;padding:7px 12px;font-size:12.5px;color:var(--mute);min-height:34px}
+.who6{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+.who6 button{
+  border:1px solid var(--line);border-radius:3px;padding:15px 8px;
+  font-size:15px;font-weight:500;background:var(--card);min-height:52px;
+}
+.who6 button:active{background:var(--ink);color:#fff;border-color:var(--ink)}
 .toast{
   position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(10px);
   background:var(--ink);color:#fff;padding:10px 16px;border-radius:3px;font-size:12.5px;
@@ -330,11 +349,8 @@ textarea.field{resize:none;line-height:1.5}
   <div class="sub2">越南篇</div>
   <div class="dt">TPE → SGN　10 · 24 — 10 · 27</div>
   <p>把想去的地方丟進來，一起投票。<br>票高的會自動排成順路的四天行程。</p>
-  <label class="fl lbl" for="nick">你是誰</label>
-  <input class="field" id="nick" placeholder="打上你的名字" autocomplete="off" maxlength="10">
-  <button class="btn" id="enterBtn">進去</button>
-  <button class="btn g" id="claimToggle">換過手機？從清單認回自己</button>
-  <div class="claim hide" id="claimRow"></div>
+  <label class="fl lbl">你是誰</label>
+  <div class="who6" id="whoPick"></div>
 </div>
 
 <div class="banner">
@@ -356,7 +372,8 @@ textarea.field{resize:none;line-height:1.5}
 </section>
 
 <section id="v-map" class="hide">
-  <div class="view viewhead"><h2>都在哪裡</h2><div class="n">點越大 · 票越多</div></div>
+  <div class="view viewhead"><h2>都在哪裡</h2><div class="n" id="mapNote">點越大 · 票越多</div></div>
+  <div class="filters" id="mapDays"></div>
   <div class="view" style="padding-top:0">
     <div id="map"></div><div class="mapnote">© OPENSTREETMAP</div>
   </div>
@@ -394,6 +411,19 @@ textarea.field{resize:none;line-height:1.5}
   <input class="field" id="nameIn" placeholder="Bánh Mì Huỳnh Hoa" autocomplete="off">
   <label class="fl lbl" for="noteIn">補一句</label>
   <input class="field" id="noteIn" placeholder="聽說要早點去不然賣完" autocomplete="off" maxlength="40">
+
+  <label class="fl lbl" for="linkIn">參考連結（IG、部落格、訂房網⋯）</label>
+  <input class="field" id="linkIn" placeholder="https://…" autocomplete="off" inputmode="url">
+
+  <div id="priceBox" class="hide">
+    <label class="fl lbl">房價（住宿才要填）</label>
+    <div class="price3">
+      <div><input class="field" id="perNightIn" type="number" inputmode="numeric" placeholder="1270"><em>元／間／晚</em></div>
+      <div><input class="field" id="roomsIn" type="number" inputmode="numeric" placeholder="3"><em>間</em></div>
+      <div><input class="field" id="nightsIn" type="number" inputmode="numeric" placeholder="3"><em>晚</em></div>
+    </div>
+    <div class="hint" id="priceHint"></div>
+  </div>
   <label class="fl lbl">截圖</label>
   <input type="file" id="shotIn" accept="image/*" style="font-size:12.5px;color:#84837D">
   <div class="shotp hide" id="shotPrev"><img id="shotImg" alt=""><span class="hint" id="shotSize"></span></div>
@@ -409,8 +439,12 @@ textarea.field{resize:none;line-height:1.5}
   <p class="lead">金額填越南盾，台幣會自動換算。</p>
   <label class="fl lbl" for="expTitle">項目</label>
   <input class="field" id="expTitle" placeholder="第一晚晚餐" autocomplete="off" maxlength="20">
-  <label class="fl lbl" for="expAmt">金額（VND）</label>
-  <input class="field" id="expAmt" type="number" inputmode="numeric" placeholder="1200000">
+  <label class="fl lbl">金額</label>
+  <div class="seg2">
+    <button id="curVND" aria-pressed="true">越南盾 VND</button>
+    <button id="curTWD" aria-pressed="false">台幣 TWD</button>
+  </div>
+  <input class="field" id="expAmt" type="number" inputmode="numeric" placeholder="1200000" style="margin-top:7px">
   <div class="hint" id="expTwd"></div>
   <label class="fl lbl">誰付的</label>
   <div class="people" id="payerPick"></div>
@@ -465,6 +499,18 @@ const SLOTCATS = CATS.filter(c=>c.k!=="住宿");
 const VOTE_NORMAL=[{v:3,cls:"a",label:"一定要去"},{v:2,cls:"b",label:"有空再去"},{v:0,cls:"c",label:"沒興趣"}];
 const VOTE_STAY  =[{v:1,cls:"a",label:"要"},{v:0,cls:"c",label:"不要"}];
 const catOf = k => CATS.find(c=>c.k===k) || CATS[3];
+
+/* 固定六位成員：不再動態新增，也就不會冒出多餘的人 */
+const MEMBERS=[
+  {id:"u-liu",   name:"小劉"},
+  {id:"u-sherry",name:"Sherry"},
+  {id:"u-mj",    name:"MJ"},
+  {id:"u-huang", name:"黃晴"},
+  {id:"u-orange",name:"橘子"},
+  {id:"u-pin",   name:"品欣"}
+];
+/* 行程四天的點點顏色（由深到淺再到黑） */
+const DAYCOLOR=["#33507A","#4C70A2","#8EABD5","#0A0B0D"];
 
 const mem={};
 const store={
@@ -545,11 +591,12 @@ async function api(action,payload){
 /* ===== 地點清單：離線預覽與第一次連線寫入試算表共用 ===== */
 function seedPlaceList(){
   const P=(name,cat,lat,lng,by,note,brief)=>({
-    id:"d"+Math.random().toString(36).slice(2,8),name,cat,lat,lng,by,note,brief,url:"",shot:""});
+    id:"d"+Math.random().toString(36).slice(2,8),name,cat,lat,lng,by,note,brief,
+    url:"",link:"",shot:"",perNight:"",rooms:"",nights:""});
   // note 是小劉自己標的補充；name 接上後端展開後會換成 Google 地圖上的店名
   const L=(label,cat,url)=>({
     id:"d"+Math.random().toString(36).slice(2,8),name:label,cat,lat:null,lng:null,
-    by:"小劉",note:label,brief:"",url,shot:""});
+    by:"小劉",note:label,brief:"",url,link:"",shot:"",perNight:"",rooms:"",nights:""});
   const PLACES=[
     P("濱城市場 Chợ Bến Thành","購物",10.7725,106.6980,"","記得殺價",
       "第一郡地標市場，日間賣乾貨、咖啡與紀念品，開價通常要對半砍。周邊夜市晚上才開。"),
@@ -571,6 +618,11 @@ function seedPlaceList(){
       "市政廳前的行人徒步區，晚上會打燈、有街頭表演，走到西貢河岸不遠。適合當一天的收尾。"),
     P("河岸酒吧 Chill Skybar","夜間",10.7735,106.7000,"","有服裝規定",
       "高樓層的露天酒吧，看得到市區夜景。消費偏高且有服裝規定，穿短褲拖鞋可能會被擋。"),
+    Object.assign(P("APEC WANDER HOTEL","住宿",null,null,"小劉","",""),
+      {perNight:1270,rooms:3,nights:3}),
+    Object.assign(P("M Village 快捷 Nguyen Du","住宿",null,null,"小劉","Modern Village Lifestyle 品牌",""),
+      {perNight:1801,rooms:3,nights:3}),
+
     P("Hôtel des Arts Saigon","住宿",10.7845,106.6890,"","第三郡，有頂樓泳池",
       "第三郡的藝術主題飯店，房間偏復古殖民風，頂樓泳池與酒吧評價好。到第一郡景點約 10 分鐘車程。"),
     P("Fusion Originals Saigon Centre","住宿",10.7760,106.7000,"","位置最中間",
@@ -592,8 +644,7 @@ function seedPlaceList(){
 }
 function demoSeed(){
   state.places=seedPlaceList();
-  state.members=[{id:"m1",name:"小劉"},{id:"m2",name:"成員二"},{id:"m3",name:"成員三"},
-                 {id:"m4",name:"成員四"},{id:"m5",name:"成員五"},{id:"m6",name:"成員六"}];
+  state.members=MEMBERS;
   // 範例票數：用固定亂數種子產生，讓每次打開看到的分佈一樣
   let sd=7;
   const rnd=()=>{ sd=(sd*1103515245+12345)%2147483648; return sd/2147483648 };
@@ -651,6 +702,14 @@ function parseMapsUrl(url){
 const gmapLink=p=>p.url||`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name)}`;
 
 /* ===== 清單 ===== */
+function priceLine(p){
+  const per=+p.perNight||0, rm=+p.rooms||0, nt=+p.nights||0;
+  if(!(per&&rm&&nt)) return "";
+  const total=per*rm*nt, each=Math.round(total/MEMBERS.length);
+  return `<div class="price">TWD ${per.toLocaleString()} × ${rm}間 × ${nt}晚 =
+    <b>TWD ${total.toLocaleString()}</b>　<span>一人 TWD ${each.toLocaleString()}</span></div>`;
+}
+
 let filterCat="全部";
 function cardHTML(p,stay){
   const c=catOf(p.cat),s=scoreOf(p.id),mv=myVote(p.id),locked=state.hotel===p.id;
@@ -664,6 +723,7 @@ function cardHTML(p,stay){
     </div>
     ${p.brief?`<div class="brief"><span class="lbl">參考介紹</span>${esc(p.brief)}</div>`
              :`<div class="brief load" data-brief="${p.id}"><span class="lbl">參考介紹</span>整理中…</div>`}
+    ${priceLine(p)}
     ${p.note?`<div class="note">「${esc(p.note)}」</div>`:""}
     <div class="vote${stay?" two":""}" data-id="${p.id}">
       ${(stay?VOTE_STAY:VOTE_NORMAL).map(o=>
@@ -674,6 +734,7 @@ function cardHTML(p,stay){
     <div class="links">
       <button data-edit="${p.id}">編輯</button>
       <a href="${gmapLink(p)}" target="_blank" rel="noopener">Google 地圖</a>
+      ${p.link?`<a href="${esc(p.link)}" target="_blank" rel="noopener">參考連結</a>`:""}
       <button class="g" data-del="${p.id}">刪掉</button>
     </div></article>`;
 }
@@ -747,25 +808,61 @@ async function fetchBriefs(){
 }
 
 /* ===== 地圖 ===== */
-let map,layer;
+let map,layer,mapDay="all";   // all｜0..3｜rest
 function renderMap(){
-  const pts=state.places.filter(p=>p.lat&&p.lng);
   if(!map){
     map=L.map("map",{zoomControl:false}).setView([10.7757,106.7004],14);
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
     L.control.zoom({position:"bottomright"}).addTo(map);
     layer=L.layerGroup().addTo(map);
   }
+
+  // 每個地點屬於哪一天（沒排進行程的是 null）
+  const plan=buildPlan(), dayOf={};
+  plan.forEach((d,i)=>d.stops.forEach(s=>{ if(!s.gap) dayOf[s.id]=i }));
+
+  $("#mapDays").innerHTML=
+    [["all","全部"],["0","10/24"],["1","10/25"],["2","10/26"],["3","10/27"],["rest","未排入"]]
+    .map(([k,t])=>{
+      const dot=/^\d$/.test(k)?`<i style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${DAYCOLOR[+k]};margin-right:5px"></i>`:"";
+      return `<button class="chip" data-mday="${k}" aria-pressed="${mapDay===k}">${dot}${t}</button>`;
+    }).join("");
+
+  const inDay=p=>{
+    if(mapDay==="all") return true;
+    if(mapDay==="rest") return dayOf[p.id]===undefined && p.cat!=="住宿";
+    return dayOf[p.id]===+mapDay;
+  };
+  const pts=state.places.filter(p=>p.lat&&p.lng);
+  const shown=pts.filter(p=>inDay(p)||p.cat==="住宿");
+
   layer.clearLayers();
-  pts.forEach(p=>{
-    const s=scoreOf(p.id),c=catOf(p.cat),hotel=p.cat==="住宿";
+
+  // 選了某一天就把順序連起來
+  if(/^\d$/.test(mapDay)){
+    const line=plan[+mapDay].stops.filter(s=>!s.gap&&s.lat&&s.lng).map(s=>[s.lat,s.lng]);
+    const hotel=state.places.find(x=>x.id===state.hotel);
+    if(hotel&&hotel.lat) line.unshift([hotel.lat,hotel.lng]);
+    if(line.length>1) L.polyline(line,{color:DAYCOLOR[+mapDay],weight:2,opacity:.5,dashArray:"4 5"}).addTo(layer);
+  }
+
+  shown.forEach(p=>{
+    const s=scoreOf(p.id), hotel=p.cat==="住宿", d=dayOf[p.id];
+    const fill = hotel ? "#fff" : (d===undefined ? "#C9C5BC" : DAYCOLOR[d]);
     L.circleMarker([p.lat,p.lng],{
-      radius:6+Math.max(0,s)*1.3,
+      radius:6+Math.max(0,s)*1.1,
       color:hotel?"#4C70A2":"#fff",weight:hotel?2.5:1.5,
-      fillColor:hotel?"#fff":c.color,fillOpacity:hotel?1:.9
-    }).addTo(layer).bindPopup(`<b>${esc(p.name)}</b><br>${c.k} · ${s} 分`);
+      fillColor:fill,fillOpacity:hotel?1:.9
+    }).addTo(layer).bindPopup(
+      `<b>${esc(p.name)}</b><br>${p.cat} · ${s} 分`+
+      (d===undefined?"":`<br>排在 ${plan[d].date}`));
   });
-  if(pts.length) map.fitBounds(pts.map(p=>[p.lat,p.lng]),{padding:[36,36],maxZoom:15});
+
+  $("#mapNote").textContent = mapDay==="all" ? "點越大 · 票越多"
+    : (mapDay==="rest" ? "還沒排進行程的" : `${plan[+mapDay].date} 的順序`);
+
+  const box=shown.length?shown:pts;
+  if(box.length) map.fitBounds(box.map(p=>[p.lat,p.lng]),{padding:[36,36],maxZoom:15});
   setTimeout(()=>map.invalidateSize(),60);
 }
 
@@ -884,52 +981,76 @@ function renderPlan(){
 }
 
 /* ===== 記帳 ===== */
+/* 一律換算成台幣結算，避免兩種幣別混在一起算不清 */
+const toTWD=e=> e.cur==="TWD" ? +e.amount : (+e.amount)/state.rate;
+const open_=()=>state.expenses.filter(e=>!e.settled);
+
 function settle(){
-  const bal={}; state.members.forEach(m=>bal[m.id]=0);
-  state.expenses.forEach(e=>{
+  const bal={}; MEMBERS.forEach(m=>bal[m.id]=0);
+  open_().forEach(e=>{
     if(!e.split||!e.split.length) return;
-    const share=e.amount/e.split.length;
-    bal[e.payer]=(bal[e.payer]||0)+e.amount;
-    e.split.forEach(id=>bal[id]=(bal[id]||0)-share);
+    const amt=toTWD(e), share=amt/e.split.length;
+    if(bal[e.payer]!==undefined) bal[e.payer]+=amt;
+    e.split.forEach(id=>{ if(bal[id]!==undefined) bal[id]-=share });
   });
   const cred=[],debt=[];
-  Object.entries(bal).forEach(([id,v])=>{ if(v>500)cred.push({id,v}); else if(v<-500)debt.push({id,v:-v}) });
+  MEMBERS.forEach(m=>{ const v=bal[m.id];
+    if(v>1)cred.push({id:m.id,v}); else if(v<-1)debt.push({id:m.id,v:-v}) });
   cred.sort((a,b)=>b.v-a.v); debt.sort((a,b)=>b.v-a.v);
   const tx=[]; let i=0,j=0;
   while(i<cred.length&&j<debt.length){
     const amt=Math.min(cred[i].v,debt[j].v);
     tx.push({from:debt[j].id,to:cred[i].id,amt});
     cred[i].v-=amt; debt[j].v-=amt;
-    if(cred[i].v<500)i++;
-    if(debt[j].v<500)j++;
+    if(cred[i].v<1)i++;
+    if(debt[j].v<1)j++;
   }
   return {bal,tx};
 }
+function money(e){
+  const n=(+e.amount).toLocaleString("en-US");
+  return e.cur==="TWD" ? {main:`TWD ${n}`, sub:""}
+                       : {main:`${n} ₫`, sub:`NT$ ${Math.round(e.amount/state.rate).toLocaleString()}`};
+}
+function expRow(e){
+  const m=money(e);
+  return `<div class="exp ${e.settled?"settled":""}">
+    <div class="x"><div class="ttl">${esc(e.title)}</div>
+      <div class="w">${esc(nameOf(e.payer))} 付 · 分 ${e.split.length} 人</div></div>
+    <div class="amt"><b>${m.main}</b>${m.sub?`<span>${m.sub}</span>`:""}</div>
+    <button class="rm" data-exp="${e.id}">×</button></div>`;
+}
 function renderCost(){
+  const opens=open_(), done=state.expenses.filter(e=>e.settled);
   $("#costCount").textContent=state.expenses.length+" 筆";
-  const total=state.expenses.reduce((a,e)=>a+e.amount,0);
-  let html=`<div class="rate">1 TWD ≈ <input id="rateIn" type="number" inputmode="numeric" value="${state.rate}"> VND　可以改</div>`;
-  html += state.expenses.length ? state.expenses.map(e=>`<div class="exp">
-      <div class="x"><div class="ttl">${esc(e.title)}</div>
-        <div class="w">${esc(nameOf(e.payer))} 付 · 分 ${e.split.length} 人</div></div>
-      <div class="amt"><b>${vnd(e.amount)}</b><span>NT$ ${twd(e.amount)}</span></div>
-      <button class="rm" data-exp="${e.id}">×</button></div>`).join("")
-    : `<div class="empty"><b>還沒記過帳</b><p>出發後誰先付了什麼，<br>按右下角記一筆就好。</p></div>`;
+  const totalTWD=opens.reduce((a,e)=>a+toTWD(e),0);
 
-  if(state.expenses.length){
+  let html=`<div class="rate">1 TWD ≈ <input id="rateIn" type="number" inputmode="numeric" value="${state.rate}"> VND　可以改</div>`;
+
+  html += opens.length ? opens.map(expRow).join("")
+    : `<div class="empty"><b>目前沒有未結的帳</b><p>誰先付了什麼，<br>按右下角記一筆就好。</p></div>`;
+
+  if(opens.length){
     const {bal,tx}=settle();
     html+=`<div class="settle"><h3>結算</h3>
-      <div class="tot">總支出 ${vnd(total)} VND · NT$ ${twd(total)}</div>`;
-    state.members.forEach(m=>{
+      <div class="tot">未結金額 NT$ ${Math.round(totalTWD).toLocaleString()}</div>`;
+    MEMBERS.forEach(m=>{
       const v=bal[m.id]||0;
       html+=`<div class="bal"><span>${esc(m.name)}</span>
-        <b class="${v>=0?"pos":""}">${v>=0?"應收":"應付"} ${vnd(Math.abs(v))}</b></div>`;
+        <b class="${v>=0?"pos":""}">${v>=0?"應收":"應付"} NT$ ${Math.round(Math.abs(v)).toLocaleString()}</b></div>`;
     });
     html += tx.length ? `<div class="tx"><span class="lbl">最少筆數還錢</span>
         ${tx.map(t=>`<div class="row"><span>${esc(nameOf(t.from))}</span><span class="arw">→</span>
-        <span>${esc(nameOf(t.to))}</span><b>${vnd(t.amt)}</b></div>`).join("")}</div>`
+        <span>${esc(nameOf(t.to))}</span><b>NT$ ${Math.round(t.amt).toLocaleString()}</b></div>`).join("")}</div>`
       : `<div class="tx"><span class="lbl">已經打平了</span></div>`;
+    html+=`<button class="btn" data-act="settleAll" style="margin-top:16px">大家還完了 · 全部結清</button>`;
     html+=`</div>`;
+  }
+
+  if(done.length){
+    html+=`<div class="view" style="padding:22px 0 0">
+      <div class="sechead"><span class="lbl">已結清 ${done.length} 筆</span></div>
+      ${done.map(expRow).join("")}</div>`;
   }
   $("#costBody").innerHTML=html;
 }
@@ -955,9 +1076,20 @@ document.addEventListener("click",async e=>{
     return;
   }
   const act=e.target.closest("[data-act]");
-  if(act){ if(act.dataset.act==="retry") boot(); return; }
+  if(act){
+    if(act.dataset.act==="retry") boot();
+    if(act.dataset.act==="settleAll"){
+      if(confirm("確定大家都還完錢了嗎？這些帳會移到已結清。")){
+        state.expenses.forEach(x=>x.settled=1);
+        api("settleAll",{}); renderCost(); toast("結清了");
+      }
+    }
+    return;
+  }
+  const md=e.target.closest("[data-mday]");
+  if(md){ mapDay=md.dataset.mday; renderMap(); return; }
   const chip=e.target.closest(".chip");
-  if(chip){ filterCat=chip.dataset.cat; renderList(); return; }
+  if(chip&&chip.dataset.cat){ filterCat=chip.dataset.cat; renderList(); return; }
   const dt=e.target.closest(".daytab");
   if(dt){ planDay=+dt.dataset.d; renderPlan(); return; }
 
@@ -1020,10 +1152,23 @@ document.addEventListener("input",e=>{
   }
   if(e.target.id==="expAmt") updateTwdHint();
 });
+let pickedCur="VND";
+function setCur(c){
+  pickedCur=c;
+  $("#curVND").setAttribute("aria-pressed",c==="VND");
+  $("#curTWD").setAttribute("aria-pressed",c==="TWD");
+  $("#expAmt").placeholder = c==="VND" ? "1200000" : "1500";
+  updateTwdHint();
+}
+$("#curVND").onclick=()=>setCur("VND");
+$("#curTWD").onclick=()=>setCur("TWD");
+
 function updateTwdHint(){
-  const v=+$("#expAmt").value;
-  $("#expTwd").textContent = v>0
-    ? `約 NT$ ${twd(v)}　一人 NT$ ${twd(v/Math.max(1,pickedSplit.length))}` : "";
+  const v=+$("#expAmt").value, n=Math.max(1,pickedSplit.length);
+  if(!(v>0)) return $("#expTwd").textContent="";
+  const t = pickedCur==="TWD" ? v : v/state.rate;
+  $("#expTwd").textContent = (pickedCur==="VND" ? `約 NT$ ${Math.round(t).toLocaleString()}　` : "")+
+    `一人 NT$ ${Math.round(t/n).toLocaleString()}`;
 }
 
 /* ---- 新增地點 ---- */
@@ -1043,6 +1188,9 @@ function openPlace(id){
     $("#urlIn").value=p.url||"";
     $("#nameIn").value=p.name||"";
     $("#noteIn").value=p.note||"";
+    $("#linkIn").value=p.link||"";
+    $("#perNightIn").value=p.perNight||""; $("#roomsIn").value=p.rooms||""; $("#nightsIn").value=p.nights||"";
+    $("#priceBox").classList.toggle("hide", p.cat!=="住宿");
     shotData=p.shot||"";
     parsed={lat:p.lat,lng:p.lng,name:p.name,short:false};
     if(p.shot){ $("#shotImg").src=p.shot; $("#shotPrev").classList.remove("hide") }
@@ -1055,7 +1203,9 @@ function openPlace(id){
 function closeSheets(){
   $("#scrim").classList.remove("on");
   $("#sheet").classList.remove("on"); $("#csheet").classList.remove("on");
-  ["#urlIn","#nameIn","#noteIn","#expTitle","#expAmt"].forEach(s=>$(s).value="");
+  ["#urlIn","#nameIn","#noteIn","#linkIn","#perNightIn","#roomsIn","#nightsIn",
+   "#expTitle","#expAmt"].forEach(s=>$(s).value="");
+  $("#priceBox").classList.add("hide"); $("#priceHint").textContent="";
   $("#shotIn").value=""; $("#shotPrev").classList.add("hide"); $("#expTwd").textContent="";
   $("#urlHint").className="hint"; $("#urlHint").textContent="貼上後會自動帶出名稱與座標。";
   pickedCat=""; shotData=""; parsed={}; editingId=null;
@@ -1069,6 +1219,14 @@ $("#catPick").addEventListener("click",e=>{
   const b=e.target.closest(".catbtn"); if(!b) return;
   pickedCat=b.dataset.c;
   $$("#catPick .catbtn").forEach(x=>x.setAttribute("aria-pressed",x===b));
+  $("#priceBox").classList.toggle("hide", pickedCat!=="住宿");
+});
+document.addEventListener("input",e=>{
+  if(["perNightIn","roomsIn","nightsIn"].indexOf(e.target.id)<0) return;
+  const per=+$("#perNightIn").value, rm=+$("#roomsIn").value, nt=+$("#nightsIn").value;
+  $("#priceHint").textContent = (per&&rm&&nt)
+    ? `總計 TWD ${(per*rm*nt).toLocaleString()}　一人 TWD ${Math.round(per*rm*nt/MEMBERS.length).toLocaleString()}`
+    : "";
 });
 $("#urlIn").addEventListener("input",e=>{
   const u=e.target.value.trim(), h=$("#urlHint");
@@ -1111,7 +1269,10 @@ $("#saveBtn").onclick=async()=>{
       const r=await api("resolve",{url}); if(r&&r.ok){lat=r.lat;lng=r.lng}
     }
     if(p.name!==name) p.brief="";            // 換了名字就重新產介紹
-    Object.assign(p,{name,cat:pickedCat,url,lat,lng,note:$("#noteIn").value.trim(),shot:shotData});
+    Object.assign(p,{name,cat:pickedCat,url,lat,lng,
+      note:$("#noteIn").value.trim(), link:$("#linkIn").value.trim(),
+      perNight:+$("#perNightIn").value||"", rooms:+$("#roomsIn").value||"", nights:+$("#nightsIn").value||"",
+      shot:shotData});
     api("updatePlace",{place:p});
     b.disabled=false; closeSheets(); renderAll(); toast("改好了");
     return;
@@ -1122,7 +1283,9 @@ $("#saveBtn").onclick=async()=>{
   const url=$("#urlIn").value.trim();
   if(url&&lat===null&&API_URL){ const r=await api("resolve",{url}); if(r&&r.ok){lat=r.lat;lng=r.lng} }
   const p={id:"p"+Date.now().toString(36),name,cat:pickedCat,lat,lng,url,
-           by:state.me.name,note:$("#noteIn").value.trim(),shot:shotData,brief:""};
+           by:state.me.name,note:$("#noteIn").value.trim(),link:$("#linkIn").value.trim(),
+           perNight:+$("#perNightIn").value||"", rooms:+$("#roomsIn").value||"", nights:+$("#nightsIn").value||"",
+           shot:shotData,brief:""};
   state.places.unshift(p); state.votes[p.id]={[state.me.id]:2};
   api("addPlace",{place:p,memberId:state.me.id});
   b.disabled=false; b.textContent="加進清單";
@@ -1133,10 +1296,10 @@ $("#saveBtn").onclick=async()=>{
 /* ---- 新增支出 ---- */
 let pickedPayer="",pickedSplit=[];
 function openCost(){
-  pickedPayer=state.me.id; pickedSplit=state.members.map(m=>m.id);
-  $("#payerPick").innerHTML=state.members.map(m=>
+  pickedPayer=state.me.id; pickedSplit=MEMBERS.map(m=>m.id); setCur("VND");
+  $("#payerPick").innerHTML=MEMBERS.map(m=>
     `<button class="pbtn" data-payer="${m.id}" aria-pressed="${m.id===pickedPayer}">${esc(m.name)}</button>`).join("");
-  $("#splitPick").innerHTML=state.members.map(m=>
+  $("#splitPick").innerHTML=MEMBERS.map(m=>
     `<button class="pbtn" data-split="${m.id}" aria-pressed="true">${esc(m.name)}</button>`).join("");
   $("#scrim").classList.add("on"); $("#csheet").classList.add("on");
 }
@@ -1157,7 +1320,8 @@ $("#expSave").onclick=()=>{
   if(!title) return toast("寫一下項目");
   if(!(amount>0)) return toast("金額要大於 0");
   if(!pickedSplit.length) return toast("至少分給一個人");
-  const x={id:"x"+Date.now().toString(36),title,amount,payer:pickedPayer,split:[...pickedSplit]};
+  const x={id:"x"+Date.now().toString(36),title,amount,cur:pickedCur,settled:0,
+           payer:pickedPayer,split:[...pickedSplit]};
   state.expenses.push(x); api("addExpense",{expense:x});
   closeSheets(); renderCost(); toast("記好了");
 };
@@ -1165,33 +1329,20 @@ $("#expSave").onclick=()=>{
 /* ---- 換人 ---- */
 $("#sortBtn").onclick=resort;
 
+/* ---- 進場：從六個人裡挑自己 ---- */
+function renderWho(){
+  $("#whoPick").innerHTML=MEMBERS.map(m=>
+    `<button data-m="${m.id}">${esc(m.name)}</button>`).join("");
+}
+$("#whoPick").addEventListener("click",e=>{
+  const b=e.target.closest("[data-m]"); if(!b) return;
+  enter(MEMBERS.find(x=>x.id===b.dataset.m));
+});
 $("#whoBtn").onclick=()=>{
-  if(!confirm("要換人嗎？會回到輸入名字的畫面。")) return;
   store.set("sgn_me","");
   state.me=null;
-  $("#nick").value="";
-  $("#claimRow").classList.add("hide");
   $("#gate").classList.remove("hide");
 };
-
-/* ---- 進場 ---- */
-$("#claimToggle").onclick=()=>{
-  const r=$("#claimRow");
-  if(!state.members.length) return toast("目前還沒有人");
-  r.classList.toggle("hide");
-  r.innerHTML=state.members.map(m=>`<button data-m="${m.id}">${esc(m.name)}</button>`).join("");
-};
-$("#claimRow").addEventListener("click",e=>{
-  const b=e.target.closest("[data-m]"); if(!b) return;
-  enter(state.members.find(x=>x.id===b.dataset.m));
-});
-$("#enterBtn").onclick=()=>{
-  const n=$("#nick").value.trim();
-  if(!n) return $("#nick").focus();
-  const m={id:"m"+Date.now().toString(36),name:n};
-  state.members.push(m); api("addMember",{member:m}); enter(m);
-};
-$("#nick").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#enterBtn").click() });
 function enter(m){
   state.me=m; store.set("sgn_me",JSON.stringify(m));
   $("#meName").textContent=m.name;
@@ -1200,7 +1351,7 @@ function enter(m){
 }
 
 function applyLoad(r){
-  state.members=r.members||[]; state.places=r.places||[]; state.votes=r.votes||{};
+  state.members=MEMBERS; state.places=r.places||[]; state.votes=r.votes||{};
   state.expenses=r.expenses||[]; state.hotel=r.hotel||null; state.rate=r.rate||800;
   try{ state.planEdits=r.planEdits?JSON.parse(r.planEdits):{} }catch(_){ state.planEdits={} }
 }
@@ -1218,6 +1369,8 @@ async function boot(){
     }
 
     if(r&&r.ok&&(r.places||[]).length){
+      const add=await api("seedMissing",{places:seedPlaceList()});
+      if(add&&add.ok&&add.n) r=await api("load",{});
       applyLoad(r);
       backfillCoords();
     } else {
@@ -1227,12 +1380,11 @@ async function boot(){
   } else demoSeed();
 
   ensureOrder(); state.order.sort((a,b)=>scoreOf(b)-scoreOf(a));
+  state.members=MEMBERS;
+  renderWho();
   const saved=store.get("sgn_me");
-  if(saved){
-    const m=JSON.parse(saved);
-    if(!state.members.find(x=>x.id===m.id)) state.members.push(m);
-    enter(m);
-  } else { renderAll(); }
+  const m=saved?MEMBERS.find(x=>x.id===JSON.parse(saved).id):null;
+  if(m) enter(m); else renderAll();
 }
 boot();
 </script>
