@@ -379,7 +379,7 @@ textarea.field{resize:none;line-height:1.5}
 <div class="banner">
   <div>
     <div class="btitle">球球小分隊 <span>越南篇</span></div>
-    <div class="sub">TPE<i>→</i>SGN　JX711　10/24　4天3夜</div>
+    <div class="sub">TPE<i>→</i>SGN　JX713　10/24 14:20　4天3夜</div>
   </div>
   <button class="who" id="whoBtn"><b id="meName">—</b><span id="memberCount">—</span></button>
 </div>
@@ -496,10 +496,10 @@ const API_URL = "https://script.google.com/macros/s/AKfycbw5mf-rspOEO1aOe7dWHBqW
 const TRIP = {
   days:[
     { date:"10/24", dow:"六",
-      note:"落地後過關、領行李、進市區抓兩小時，中午才真正開始。",
-      head:{ t:"10:15", n:"抵達 新山一機場 SGN", s:"JX711 · Grab 進第一郡約 40 分" },
-      checkin:"11:45",
-      slots:[["12:30","正餐"],["14:15","景點"],["16:00","咖啡甜點"],["18:00","正餐"],["20:00","夜間"]] },
+      note:"傍晚才落地，過關領行李加進市區約一小時，第一天只夠吃頓晚餐再逛一下。",
+      head:{ t:"16:55", n:"抵達 新山一機場 SGN", s:"JX713 · Grab 進第一郡約 40 分" },
+      checkin:"18:00",
+      slots:[["19:00","正餐"],["21:00","夜間"]] },
     { date:"10/25", dow:"日", note:"完整的一天。",
       slots:[["08:30","早餐"],["09:45","景點"],["11:15","景點"],["12:30","正餐"],
              ["14:15","咖啡甜點"],["15:45","景點"],["17:30","體驗"],
@@ -1128,7 +1128,7 @@ function renderPlan(){
     <div class="n">${esc(d.head.n)}</div><div class="m">${esc(d.head.s)}</div></div>`;
 
   if(h){
-    if(d.head) html+=`<div class="hop">機場到市區 約 40 分</div>`;
+    if(d.head) html+=`<div class="hop">機場到市區 約 40 分（傍晚可能更久）</div>`;
     const t=d.checkin||d.checkout||"08:15";
     const what=d.checkin?"入住 · 放行李":(d.checkout?"退房 · 行李寄放櫃檯":"從這裡出發");
     html+=`<div class="stub base"><div class="t">${t}</div>
