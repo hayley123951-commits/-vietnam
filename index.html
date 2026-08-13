@@ -178,6 +178,16 @@ input,select,textarea{font-family:inherit;font-size:16px;color:inherit}
   position:absolute;top:6px;right:6px;width:28px;height:28px;
   color:var(--line);font-size:15px;line-height:1;
 }
+.grip{
+  position:absolute;right:6px;bottom:4px;width:30px;height:30px;
+  color:var(--line);font-size:13px;line-height:30px;text-align:center;
+  cursor:grab;touch-action:none;user-select:none;
+}
+.stub.dragging{
+  z-index:20;box-shadow:0 8px 24px -8px rgba(10,11,13,.4);
+  border-color:var(--sky);opacity:.96;
+}
+.stub.over{border-color:var(--blue);border-style:dashed}
 .stub::before{
   content:"";position:absolute;left:-17px;top:16px;width:6px;height:6px;border-radius:50%;
   background:var(--ink);outline:3px solid var(--paper);
@@ -686,8 +696,10 @@ function status(msg){
   const el=$("#statusBar");
   if(!msg){ el.classList.add("hide"); el.innerHTML=""; return }
   el.classList.remove("hide");
+  const dup=findDupes().length;
   el.innerHTML=`<i class="dot"></i><span>${esc(msg)}</span>`+
-               `<button data-act="retry">重新連線</button>`;
+    (dup?`<button data-act="clean">清掉重複</button>`
+        :`<button data-act="retry">重新連線</button>`);
 }
 function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove("on"),2200)}
 const scoreOf=id=>Object.values(state.votes[id]||{}).reduce((a,b)=>a+b,0);
@@ -806,6 +818,31 @@ function parseBooking(u){
   return out;
 }
 
+/* 同一個網址（沒網址就同名）算同一個地方；留有座標的那筆 */
+function findDupes(){
+  const seen={}, extra=[];
+  state.places.forEach(p=>{
+    const k=(p.url||"").trim() ? "u:"+p.url.trim() : "n:"+String(p.name).trim();
+    if(k==="n:") return;
+    if(!seen[k]){ seen[k]=p; return }
+    if(!seen[k].lat && p.lat){ extra.push(seen[k].id); seen[k]=p }
+    else extra.push(p.id);
+  });
+  return extra;
+}
+async function cleanDupes(){
+  const ids=findDupes();
+  if(!ids.length) return toast("沒有重複的");
+  status(`正在清掉 ${ids.length} 筆重複…`);
+  for(const id of ids){
+    state.places=state.places.filter(p=>p.id!==id);
+    delete state.votes[id];
+    await api("deletePlace",{id});
+  }
+  status(null); ensureOrder(); renderAll();
+  toast(`清掉了 ${ids.length} 筆重複的地點`);
+}
+
 function priceLine(p){
   const per=+p.perNight||0, rm=+p.rooms||0, nt=+p.nights||0;
   if(!(per&&rm&&nt)) return "";
@@ -846,6 +883,8 @@ function renderList(){
   const stays=state.places.filter(p=>p.cat==="住宿");
   const rest=state.places.filter(p=>p.cat!=="住宿");
   $("#listCount").textContent=rest.length;
+  const dup=findDupes();
+  if(dup.length) status(`有 ${dup.length} 筆重複的地點`);
   $("#memberCount").textContent=state.members.length+" 人";
 
   $("#stayZone").innerHTML = stays.length ? `<div class="view" style="padding-top:0;padding-bottom:2px">
@@ -1002,26 +1041,66 @@ function buildPlan(){
   const hotel=state.places.find(p=>p.id===state.hotel)||null;
   const pool=state.places.filter(p=>p.cat!=="住宿"&&scoreOf(p.id)>0).map(p=>({...p,s:scoreOf(p.id)}));
   const used=new Set();
+
+  // 手動排過的地點先佔位，免得被別天的自動排序搶走
+  TRIP.days.forEach((_,di)=>{
+    const pins=(state.planEdits[di]||{}).pins;
+    if(pins) pins.forEach(id=>{ if(id) used.add(id) });
+  });
+
   return TRIP.days.map((day,di)=>{
     const times=dayTimes(di);
+    const pins=(state.planEdits[di]||{}).pins;
     let last=hotel, first=true;
     const stops=[];
-    day.slots.forEach(([,cat],i)=>{
+
+    day.slots.forEach(([,slotCat],i)=>{
       if(isRemoved(di,i)) return;
       const at=hhmm(times[i]);
-      const cand=pool.filter(p=>!used.has(p.id)&&p.cat===cat);
-      if(!cand.length){ stops.push({at,cat,slot:i,gap:true}); return }
-      const best=cand.map(p=>{
-        const ride=(last&&last.lat&&p.lat)?rideMin(last,p):null;
-        return {p,ride,adj:p.s-(ride||0)/10*0.5};
-      }).sort((a,b)=>b.adj-a.adj)[0];
-      used.add(best.p.id);
-      const ride=(first&&!hotel)?null:best.ride;
-      first=false; last=best.p;
-      stops.push({at,cat,slot:i,gap:false,...best.p,ride});
+      let chosen=null;
+
+      if(pins){                                   // 這天已經手動排過
+        const id=pins[i];
+        chosen = id ? pool.find(p=>p.id===id) : null;
+      } else {                                    // 自動排：票高優先、避開繞遠路
+        const cand=pool.filter(p=>!used.has(p.id)&&p.cat===slotCat);
+        if(cand.length){
+          const best=cand.map(p=>{
+            const ride=(last&&last.lat&&p.lat)?rideMin(last,p):null;
+            return {p,ride,adj:p.s-(ride||0)/10*0.5};
+          }).sort((a,b)=>b.adj-a.adj)[0];
+          chosen=best.p; used.add(chosen.id);
+        }
+      }
+
+      if(!chosen){ stops.push({at,cat:slotCat,slot:i,gap:true}); return }
+      const ride=(last&&last.lat&&chosen.lat)?rideMin(last,chosen):null;
+      stops.push({at,cat:chosen.cat,slot:i,gap:false,...chosen,
+                  ride:(first&&!hotel)?null:ride});
+      first=false; last=chosen;
     });
-    return {...day,stops,filled:stops.filter(s=>!s.gap).length};
+    return {...day,stops,filled:stops.filter(s=>!s.gap).length,pinned:!!pins};
   });
+}
+
+/* 第一次拖曳時，把當天目前的結果固定下來 */
+function freezePins(di){
+  const e=state.planEdits[di]=state.planEdits[di]||{};
+  if(e.pins) return e.pins;
+  const d=buildPlan()[di];
+  e.pins=TRIP.days[di].slots.map((_,i)=>{
+    const s=d.stops.find(x=>x.slot===i);
+    return (s&&!s.gap)?s.id:null;
+  });
+  return e.pins;
+}
+function movePin(di,from,to){
+  if(from===to) return;
+  const pins=freezePins(di).slice();
+  const [x]=pins.splice(from,1);
+  pins.splice(to,0,x);
+  state.planEdits[di].pins=pins;
+  saveEdits(); renderPlan();
 }
 
 /* 排定的時段落在營業時間外就提醒 */
@@ -1043,7 +1122,7 @@ function renderPlan(){
       <b>${d.date}</b><span>週${d.dow} · ${d.filled}</span></button>`).join("");
 
   const d=plan[planDay];
-  let html=`<div class="dayhead">${esc(d.note)}　時間可以直接點著改，改一格後面會跟著移動。</div><div class="rail">`;
+  let html=`<div class="dayhead">${esc(d.note)}　時間可以點著改，右下角 ⠿ 可以拖著換順序。</div><div class="rail">`;
 
   if(d.head) html+=`<div class="stub fix"><div class="t">${d.head.t}<em>班機</em></div>
     <div class="n">${esc(d.head.n)}</div><div class="m">${esc(d.head.s)}</div></div>`;
@@ -1061,19 +1140,20 @@ function renderPlan(){
     const time=`<div class="t"><button class="tbtn" data-time="${s.slot}">${s.at}</button>${
       s.gap?"":`<em>${catOf(s.cat).mins}分</em>`}</div>`;
     if(s.gap){
-      html+=`<div class="stub gap">${time}
+      html+=`<div class="stub gap" data-slot="${s.slot}">${time}
         <div class="n">還缺一個「${s.cat}」</div><div class="m">丟一個進來就會補上</div>
         <button class="xbtn" data-rm="${s.slot}">×</button></div>`;
       return;
     }
     const hw=hoursWarn(s);
-    html+=`<div class="stub">${time}
+    html+=`<div class="stub" data-slot="${s.slot}">${time}
       <div class="n">${esc(s.name)}</div>
       <div class="m"><span class="tag">${s.cat}</span><span>${s.s} 分</span>
       ${s.hours?`<span>${esc(s.hours)}</span>`:""}
       ${s.note?`<span>· ${esc(s.note)}</span>`:""}</div>
       ${hw?`<div style="margin-top:7px"><span class="warn">${esc(hw)}</span></div>`:""}
-      <button class="xbtn" data-rm="${s.slot}">×</button></div>`;
+      <button class="xbtn" data-rm="${s.slot}">×</button>
+      <div class="grip" data-grip="${s.slot}">⠿</div></div>`;
   });
 
   if(h&&!d.tail) html+=`<div class="hop">收工回飯店</div>
@@ -1084,10 +1164,13 @@ function renderPlan(){
   html+=`</div>`;
 
   const ed=state.planEdits[planDay];
-  if(ed&&(ed.removed?.length||Object.keys(ed.times||{}).length)){
-    const rm=ed.removed?.length||0;
-    html+=`<div class="planedit"><span>${rm?`移除了 ${rm} 格 · `:""}這天改過時間</span>
-      <button data-reset="${planDay}">還原這天</button></div>`;
+  if(ed&&(ed.pins||ed.removed?.length||Object.keys(ed.times||{}).length)){
+    const bits=[];
+    if(ed.pins) bits.push("手動排過順序");
+    if(Object.keys(ed.times||{}).length) bits.push("改過時間");
+    if(ed.removed?.length) bits.push(`移除了 ${ed.removed.length} 格`);
+    html+=`<div class="planedit"><span>${bits.join(" · ")}</span>
+      <button data-reset="${planDay}">回到自動排序</button></div>`;
   }
   const gaps=d.stops.filter(s=>s.gap).length;
   html+=`<div class="planfoot">
@@ -1095,6 +1178,43 @@ function renderPlan(){
     ${h?"已經以住宿為每天的起點重算。":"到清單上面的住宿區鎖定一間，行程會以飯店為起點重排。"}
     ${gaps?`這天還有 ${gaps} 格沒東西可放。`:""}</div>`;
   $("#planBody").innerHTML=html;
+  initDrag();
+}
+
+/* 拖曳：按住 ⠿ 上下移動，放開就換位 */
+function initDrag(){
+  const rail=$("#planBody .rail"); if(!rail) return;
+  let el=null,slot=0,y0=0,target=null;
+  const stubs=()=>[...rail.querySelectorAll(".stub[data-slot]")];
+
+  rail.querySelectorAll("[data-grip]").forEach(g=>{
+    g.addEventListener("pointerdown",e=>{
+      e.preventDefault();
+      el=g.closest(".stub"); slot=+g.dataset.grip; y0=e.clientY; target=null;
+      el.classList.add("dragging");
+      g.setPointerCapture(e.pointerId);
+    });
+    g.addEventListener("pointermove",e=>{
+      if(!el) return;
+      el.style.transform=`translateY(${e.clientY-y0}px)`;
+      target=null;
+      stubs().forEach(s=>{
+        s.classList.remove("over");
+        if(s===el) return;
+        const r=s.getBoundingClientRect();
+        if(e.clientY>=r.top&&e.clientY<=r.bottom){ s.classList.add("over"); target=+s.dataset.slot }
+      });
+    });
+    const drop=()=>{
+      if(!el) return;
+      el.style.transform=""; el.classList.remove("dragging");
+      stubs().forEach(s=>s.classList.remove("over"));
+      const t=target; el=null; target=null;
+      if(t!=null&&t!==slot) movePin(planDay,slot,t);
+    };
+    g.addEventListener("pointerup",drop);
+    g.addEventListener("pointercancel",drop);
+  });
 }
 
 /* ===== 記帳 ===== */
@@ -1195,6 +1315,7 @@ document.addEventListener("click",async e=>{
   const act=e.target.closest("[data-act]");
   if(act){
     if(act.dataset.act==="retry") boot();
+    if(act.dataset.act==="clean") cleanDupes();
     if(act.dataset.act==="settleAll"){
       if(confirm("確定大家都還完錢了嗎？這些帳會移到已結清。")){
         state.expenses.forEach(x=>x.settled=1);
