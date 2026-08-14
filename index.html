@@ -730,16 +730,43 @@ function haversine(a,b){
 }
 const rideMin=(a,b)=>Math.max(7,Math.round(haversine(a,b)*1.35/18*60));
 
+/* Google 地圖的網址有很多種長相，手機分享、電腦網址列、商家連結各不相同 */
 function parseMapsUrl(url){
   const o={name:"",lat:null,lng:null,short:false};
   if(!url) return o;
+  url=url.trim();
   if(/maps\.app\.goo\.gl|goo\.gl\/maps/.test(url)) o.short=true;
-  const at=url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if(at){o.lat=+at[1];o.lng=+at[2]}
-  if(o.lat===null){const d=url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);if(d){o.lat=+d[1];o.lng=+d[2]}}
-  if(o.lat===null){const q=url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);if(q){o.lat=+q[1];o.lng=+q[2]}}
-  const pl=url.match(/\/place\/([^\/@?]+)/);
-  if(pl){try{o.name=decodeURIComponent(pl[1]).replace(/\+/g," ")}catch(e){}}
+
+  // 順序很重要：!3d!4d 是「地點本身」的座標，
+  // @ 只是分享當下的鏡頭位置 —— 地圖拉遠時兩者可以差上千公里。
+  const pats=[
+    /!8m2!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,
+    /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,
+    /@(-?\d+\.\d+),\s*(-?\d+\.\d+)/,
+    /[?&]q=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,
+    /[?&]ll=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,
+    /[?&]center=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,
+    /[?&]daddr=(-?\d+\.\d+),\s*(-?\d+\.\d+)/
+  ];
+  for(const re of pats){
+    const m=url.match(re);
+    if(m){ o.lat=+m[1]; o.lng=+m[2]; break }
+  }
+
+  // 名稱：/place/名稱、/search/名稱，或 ?q=文字
+  let nm=url.match(/\/maps\/place\/([^\/@?#]+)/)
+        || url.match(/\/maps\/search\/([^\/@?#]+)/);
+  let raw=nm?nm[1]:"";
+  if(!raw){
+    const q=url.match(/[?&]q=([^&#]+)/);
+    if(q && !/^-?\d+\.\d+,/.test(decodeURIComponent(q[1]))) raw=q[1];
+  }
+  if(raw){
+    try{
+      o.name=decodeURIComponent(raw).replace(/\+/g," ").trim();
+    }catch(e){ o.name=raw.replace(/\+/g," ").trim() }
+    if(/^data=|^@|^-?\d+\.\d+$/.test(o.name)) o.name="";   // 抓到的其實是參數，不是名稱
+  }
   return o;
 }
 const gmapLink=p=>p.url||`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name)}`;
@@ -1565,16 +1592,41 @@ document.addEventListener("input",e=>{
     ? `總計 TWD ${(per*rm*nt).toLocaleString()}　一人 TWD ${Math.round(per*rm*nt/MEMBERS.length).toLocaleString()}`
     : "";
 });
+let urlTimer=null;
 $("#urlIn").addEventListener("input",e=>{
-  const u=e.target.value.trim(), h=$("#urlHint");
-  if(!u){ h.className="hint"; h.textContent="貼上後會自動帶出名稱與座標。"; parsed={}; return }
+  const u=e.target.value.trim(), hint=$("#urlHint");
+  clearTimeout(urlTimer);
+  if(!u){ hint.className="hint"; hint.textContent="貼上後會自動帶出名稱與座標。"; parsed={}; return }
+
   parsed=parseMapsUrl(u);
   if(parsed.name&&!$("#nameIn").value) $("#nameIn").value=parsed.name;
-  if(parsed.lat!==null){ h.className="hint o"; h.textContent=`已取得座標 ${parsed.lat.toFixed(4)}, ${parsed.lng.toFixed(4)}` }
-  else if(parsed.short&&!API_URL){ h.className="hint w"; h.textContent="短網址要接上後端才展得開，先手動打名字。" }
-  else if(parsed.short){ h.className="hint"; h.textContent="短網址，送出時會自動展開。" }
-  else { h.className="hint w"; h.textContent="讀不出座標。直接打名字也可以，只是不會上地圖。" }
+  showUrlHint();
+
+  // 名稱或座標任一缺漏，就請後端跟著轉址展開一次
+  if(API_URL && (parsed.lat===null || !parsed.name)){
+    hint.className="hint"; hint.textContent="正在展開這個連結…";
+    urlTimer=setTimeout(async()=>{
+      const r=await api("resolve",{url:u});
+      if(r&&r.ok){
+        if(parsed.lat===null && r.lat!=null){ parsed.lat=r.lat; parsed.lng=r.lng }
+        if(!parsed.name && r.name){ parsed.name=r.name; if(!$("#nameIn").value) $("#nameIn").value=r.name }
+      }
+      showUrlHint(r);
+    },600);
+  }
 });
+function showUrlHint(r){
+  const hint=$("#urlHint"), got=[];
+  if(parsed.name) got.push("名稱");
+  if(parsed.lat!==null) got.push(`座標 ${parsed.lat.toFixed(4)}, ${parsed.lng.toFixed(4)}`);
+  if(got.length===2){ hint.className="hint o"; hint.textContent="已取得 "+got.join("、"); return }
+  if(got.length===1){ hint.className="hint o"; hint.textContent="已取得"+got[0]+"。另一項讀不到，可以自己補。"; return }
+  if(parsed.short&&!API_URL){ hint.className="hint w"; hint.textContent="短網址要接上後端才展得開，先手動打名字。"; return }
+  hint.className="hint w";
+  hint.textContent = r===undefined
+    ? "這個網址讀不出東西，直接打名字也可以。"
+    : "這個網址展不開。試試在 Google 地圖上按「分享」複製連結，那種最好讀。";
+}
 $("#shotIn").addEventListener("change",e=>{
   const f=e.target.files[0]; if(!f) return;
   const img=new Image(), fr=new FileReader();
