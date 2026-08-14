@@ -85,16 +85,12 @@ input,select,textarea{font-family:inherit;font-size:16px;color:inherit}
 .chip[aria-pressed="true"] em{opacity:.5}
 
 .card{background:var(--card);border:1px solid var(--line-l);border-radius:4px;margin-bottom:9px}
-.card .top,.stay .top{display:flex;gap:12px;padding:13px 14px 11px}
-.mark{
-  flex:0 0 44px;height:44px;border-radius:3px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:16px;font-weight:500;overflow:hidden;
-}
+.card .top,.stay .top{display:flex;gap:12px;padding:14px 14px 12px;align-items:flex-start}
+.mark{flex:0 0 44px;height:44px;border-radius:3px;overflow:hidden}
 .mark img{width:100%;height:100%;object-fit:cover;display:block}
 .info{flex:1;min-width:0}
-.name{font-weight:500;font-size:15px;line-height:1.35;margin:0 0 5px;word-break:break-word}
-.meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.name{font-weight:600;font-size:17px;line-height:1.3;letter-spacing:-.015em;margin:0 0 5px;word-break:break-word}
+.meta{font-family:var(--mono);font-size:11px;letter-spacing:.02em;color:var(--mute)}
 .tag{
   font-family:var(--mono);font-size:10px;letter-spacing:.09em;
   border:1px solid var(--line);border-radius:2px;padding:2px 6px;color:var(--mute);
@@ -102,7 +98,7 @@ input,select,textarea{font-family:inherit;font-size:16px;color:inherit}
 .by{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;color:var(--mute)}
 .tag.warn{color:var(--blue);border-color:var(--sky)}
 .sc{flex:0 0 auto;text-align:right;min-width:26px}
-.sc b{display:block;font-family:var(--mono);font-weight:600;font-size:21px;line-height:1}
+.sc b{display:block;font-family:var(--mono);font-weight:600;font-size:23px;line-height:1}
 .sc.z b{color:var(--line)}
 .brief{
   padding:11px 14px 12px;font-size:12.5px;line-height:1.7;color:#4A4A46;
@@ -110,18 +106,29 @@ input,select,textarea{font-family:inherit;font-size:16px;color:inherit}
 }
 .brief .lbl{display:block;margin-bottom:5px}
 .brief.load{color:var(--mute)}
-.note{font-size:12.5px;color:var(--mute);padding:0 14px 11px}
+.note{padding:0 14px 12px}
+.note span{
+  display:block;font-size:13px;line-height:1.6;color:#5B5A55;
+  padding-left:9px;border-left:2px solid var(--line);
+}
 
 .vote{display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid var(--line-l)}
 .vote.two{grid-template-columns:1fr 1fr}
 .vote button{
-  padding:10px 2px;font-size:12px;color:var(--mute);
-  border-right:1px solid var(--line-l);min-height:42px;transition:background .12s,color .12s;
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  padding:0 3px;min-height:44px;font-size:13px;
+  border-right:1px solid var(--line-l);transition:background .12s,color .12s;
 }
 .vote button:last-child{border-right:0}
-.vote .a[aria-pressed="true"]{background:var(--blue);color:#fff;font-weight:500}
-.vote .b[aria-pressed="true"]{background:var(--tint);color:var(--blue-d);font-weight:500}
-.vote .c[aria-pressed="true"]{background:#E5E2D9;color:var(--mute)}
+.vote button em{font-family:var(--mono);font-style:normal;font-size:11px;opacity:.6}
+/* 還沒投：三格由深到淺，一眼看得出份量 */
+.vote .a{background:#B5D4F4;color:#042C53;font-weight:500}
+.vote .b{background:var(--tint);color:var(--blue)}
+.vote .c{background:var(--card);color:var(--mute)}
+/* 投過了：整排安靜下來，只留選中的那格 */
+.vote.done button{background:var(--card);color:var(--mute);font-weight:400}
+.vote button[aria-pressed="true"]{background:var(--blue);color:#fff;font-weight:500}
+.vote button[aria-pressed="true"] em{opacity:.7}
 .links{display:flex;border-top:1px solid var(--line-l)}
 .links a,.links button{
   flex:1;text-align:center;padding:9px 4px;font-size:11.5px;color:var(--blue);
@@ -302,10 +309,6 @@ textarea.field{resize:none;line-height:1.5}
   display:block;font-style:normal;font-family:var(--mono);font-size:9.5px;
   letter-spacing:.06em;color:var(--mute);text-align:center;margin-top:4px;
 }
-.hours{
-  padding:0 14px 10px;font-family:var(--mono);font-size:11.5px;
-  letter-spacing:.03em;color:var(--mute);
-}
 .warn{
   display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.06em;
   color:#B4541F;border:1px solid #E0B08A;border-radius:2px;padding:2px 6px;
@@ -356,6 +359,17 @@ textarea.field{resize:none;line-height:1.5}
   font-size:15px;font-weight:500;background:var(--card);min-height:52px;
 }
 .who6 button:active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.veil{
+  position:fixed;inset:0;z-index:60;pointer-events:none;
+  background:rgba(239,236,227,.62);backdrop-filter:blur(1.5px);
+  display:flex;align-items:flex-start;justify-content:center;
+  padding-top:38vh;transition:opacity .25s;
+}
+.veil.hide{display:flex !important;opacity:0}
+.veil span{
+  background:var(--ink);color:#fff;font-family:var(--mono);
+  font-size:12px;letter-spacing:.08em;padding:10px 18px;border-radius:3px;
+}
 .toast{
   position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(10px);
   background:var(--ink);color:#fff;padding:10px 16px;border-radius:3px;font-size:12.5px;
@@ -483,6 +497,7 @@ textarea.field{resize:none;line-height:1.5}
   <button class="btn g" id="expCancel">取消</button>
 </div>
 
+<div class="veil hide" id="veil"><span>資料更新中…</span></div>
 <div class="toast" id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -651,10 +666,6 @@ function seedPlaceList(){
       "市政廳前的行人徒步區，晚上會打燈、有街頭表演，走到西貢河岸不遠。適合當一天的收尾。"),
     P("河岸酒吧 Chill Skybar","夜間",10.7735,106.7000,"","有服裝規定",
       "高樓層的露天酒吧，看得到市區夜景。消費偏高且有服裝規定，穿短褲拖鞋可能會被擋。"),
-    Object.assign(P("APEC WANDER HOTEL","住宿",null,null,"小劉","",""),
-      {perNight:1270,rooms:3,nights:3}),
-    Object.assign(P("M Village 快捷 Nguyen Du","住宿",null,null,"小劉","Modern Village Lifestyle 品牌",""),
-      {perNight:1801,rooms:3,nights:3}),
 
 
     // ↓ 你的收藏連結。名稱先用你給的標籤，接上後端後會自動換成真實店名與座標
@@ -696,10 +707,13 @@ function status(msg){
   const el=$("#statusBar");
   if(!msg){ el.classList.add("hide"); el.innerHTML=""; return }
   el.classList.remove("hide");
-  const dup=findDupes().length;
   el.innerHTML=`<i class="dot"></i><span>${esc(msg)}</span>`+
-    (dup?`<button data-act="clean">清掉重複</button>`
-        :`<button data-act="retry">重新連線</button>`);
+               `<button data-act="retry">重新連線</button>`;
+}
+function veil(on,msg){
+  const el=$("#veil");
+  if(msg) el.querySelector("span").textContent=msg;
+  el.classList.toggle("hide",!on);
 }
 function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove("on"),2200)}
 const scoreOf=id=>Object.values(state.votes[id]||{}).reduce((a,b)=>a+b,0);
@@ -769,10 +783,6 @@ function parseHours(s){
   if(close<=open) close+=1440;          // 跨午夜
   return {open,close};
 }
-function hoursLine(p){
-  if(!p.hours) return "";
-  return `<div class="hours">${esc(p.hours)}</div>`;
-}
 
 const linksOf=p=>String(p.link||"").split(/[\n|]+/).map(s=>s.trim()).filter(Boolean);
 function hostOf(u){ try{ return new URL(u).hostname.replace(/^www\./,"") }catch(e){ return "連結" } }
@@ -820,27 +830,66 @@ function parseBooking(u){
 
 /* 同一個網址（沒網址就同名）算同一個地方；留有座標的那筆 */
 function findDupes(){
-  const seen={}, extra=[];
+  const seen={}, pairs=[];     // [{drop, keep}]
   state.places.forEach(p=>{
     const k=(p.url||"").trim() ? "u:"+p.url.trim() : "n:"+String(p.name).trim();
     if(k==="n:") return;
     if(!seen[k]){ seen[k]=p; return }
-    if(!seen[k].lat && p.lat){ extra.push(seen[k].id); seen[k]=p }
-    else extra.push(p.id);
+    if(!seen[k].lat && p.lat){ pairs.push({drop:seen[k].id, keep:p.id}); seen[k]=p }
+    else pairs.push({drop:p.id, keep:seen[k].id});
   });
-  return extra;
+  return pairs;
 }
-async function cleanDupes(){
-  const ids=findDupes();
-  if(!ids.length) return toast("沒有重複的");
-  status(`正在清掉 ${ids.length} 筆重複…`);
-  for(const id of ids){
-    state.places=state.places.filter(p=>p.id!==id);
-    delete state.votes[id];
-    await api("deletePlace",{id});
+/* 目前狀態打包成跟 load 一樣的形狀，供快取使用 */
+function snapshot(){
+  return { ok:true, members:MEMBERS, places:state.places, votes:state.votes,
+           expenses:state.expenses, hotel:state.hotel, rate:state.rate,
+           planEdits:JSON.stringify(state.planEdits), seedVersion:SEED_VERSION };
+}
+
+/* 我先前暫代用的飯店，每次載完就順手清掉 */
+async function autoRetire(){
+  const gone=state.places.filter(p=>RETIRED.indexOf(String(p.name).trim())>=0);
+  if(!gone.length) return false;
+  veil(true,`正在移除 ${gone.length} 間暫代飯店…`);
+  for(const p of gone){
+    state.places=state.places.filter(x=>x.id!==p.id);
+    delete state.votes[p.id];
+    if(state.hotel===p.id) state.hotel=null;
+    await api("deletePlace",{id:p.id});
   }
-  status(null); ensureOrder(); renderAll();
-  toast(`清掉了 ${ids.length} 筆重複的地點`);
+  console.log(`[自動移除] ${gone.map(p=>p.name).join("、")}`);
+  return true;
+}
+
+/* 每次載完資料都自動跑，不需要任何人按按鈕 */
+async function autoClean(){
+  const pairs=findDupes();
+  if(!pairs.length) return false;
+  veil(true,`正在清掉 ${pairs.length} 筆重複…`);
+
+  for(const {drop,keep} of pairs){
+    // 投在重複那列上的票，先搬到要保留的那列，免得白投
+    const from=state.votes[drop]||{}, to=state.votes[keep]=state.votes[keep]||{};
+    const kp=state.places.find(p=>p.id===keep)||{};
+    const scale=kp.cat==="住宿"?VOTE_STAY:VOTE_NORMAL;
+    for(const mid of Object.keys(from)){
+      if(to[mid]!==undefined) continue;              // 本來就投過就不覆蓋
+      const v=from[mid];
+      to[mid]=v;
+      await api("vote",{placeId:keep,memberId:mid,value:v,
+        who:{ place:kp.name||"", member:nameOf(mid),
+              label:(scale.find(o=>o.v===v)||{}).label||"" }});
+    }
+    state.places=state.places.filter(p=>p.id!==drop);
+    delete state.votes[drop];
+    if(state.hotel===drop) state.hotel=keep;
+    await api("deletePlace",{id:drop});
+  }
+  saveCache(snapshot());
+  ensureOrder(); renderAll(); veil(false);
+  console.log(`[自動清理] 移除了 ${ids.length} 筆重複`);
+  return true;
 }
 
 function priceLine(p){
@@ -854,22 +903,24 @@ function priceLine(p){
 let filterCat="全部";
 function cardHTML(p,stay){
   const c=catOf(p.cat),s=scoreOf(p.id),mv=myVote(p.id),locked=state.hotel===p.id;
+  const meta=[c.k, p.by||"", p.hours||""].filter(Boolean).join(" · ");
   return `<article class="${stay?`stay${locked?" on":""}`:"card"}">
     <div class="top">
-      <div class="mark" style="${p.shot?"":`background:${c.color}1A;color:${c.color}`}">${p.shot?`<img src="${p.shot}" alt="">`:c.ch}</div>
-      <div class="info"><div class="name">${esc(p.name)}</div>
-        <div class="meta"><span class="tag">${c.k}</span>${
-          p.by?`<span class="by">${esc(p.by)} 丟的</span>`:""}</div></div>
+      ${p.shot?`<div class="mark"><img src="${p.shot}" alt=""></div>`:""}
+      <div class="info">
+        <div class="name">${esc(p.name)}</div>
+        <div class="meta">${esc(meta)}</div>
+      </div>
       <div class="sc ${s===0?"z":""}"><b>${s}</b></div>
     </div>
+    ${p.note?`<div class="note"><span>${esc(p.note)}</span></div>`:""}
     ${p.brief?`<div class="brief"><span class="lbl">參考介紹</span>${esc(p.brief)}</div>`:""}
-    ${hoursLine(p)}
     ${priceLine(p)}
     ${refRow(p)}
-    ${p.note?`<div class="note">「${esc(p.note)}」</div>`:""}
-    <div class="vote${stay?" two":""}" data-id="${p.id}">
+    <div class="vote${stay?" two":""}${mv!==undefined?" done":""}" data-id="${p.id}">
       ${(stay?VOTE_STAY:VOTE_NORMAL).map(o=>
-        `<button class="${o.cls}" data-v="${o.v}" aria-pressed="${mv===o.v}">${o.label}</button>`).join("")}
+        `<button class="${o.cls}" data-v="${o.v}" aria-pressed="${mv===o.v}">${o.label}${
+          stay?"":`<em>${o.v}</em>`}</button>`).join("")}
     </div>
     ${stay?`<div class="staybar"><span>${locked?"已鎖定 · 行程以這裡為起點":"票選中"}</span>
       <button class="lockbtn ${locked?"on":""}" data-lock="${p.id}">${locked?"取消鎖定":"鎖定這間"}</button></div>`:""}
@@ -883,8 +934,6 @@ function renderList(){
   const stays=state.places.filter(p=>p.cat==="住宿");
   const rest=state.places.filter(p=>p.cat!=="住宿");
   $("#listCount").textContent=rest.length;
-  const dup=findDupes();
-  if(dup.length) status(`有 ${dup.length} 筆重複的地點`);
   $("#memberCount").textContent=state.members.length+" 人";
 
   $("#stayZone").innerHTML = stays.length ? `<div class="view" style="padding-top:0;padding-bottom:2px">
@@ -931,6 +980,7 @@ function refreshCard(id){
   const box=document.querySelector(`.vote[data-id="${id}"]`);
   if(!box) return renderList();
   const mv=myVote(id), s=scoreOf(id);
+  box.classList.toggle("done", mv!==undefined);
   [...box.children].forEach(b=>b.setAttribute("aria-pressed", +b.dataset.v===mv));
   const sc=box.closest("article").querySelector(".sc");
   sc.querySelector("b").textContent=s;
@@ -1315,7 +1365,6 @@ document.addEventListener("click",async e=>{
   const act=e.target.closest("[data-act]");
   if(act){
     if(act.dataset.act==="retry") boot();
-    if(act.dataset.act==="clean") cleanDupes();
     if(act.dataset.act==="settleAll"){
       if(confirm("確定大家都還完錢了嗎？這些帳會移到已結清。")){
         state.expenses.forEach(x=>x.settled=1);
@@ -1363,7 +1412,12 @@ document.addEventListener("click",async e=>{
     if(state.votes[id][state.me.id]===v) delete state.votes[id][state.me.id];
     else state.votes[id][state.me.id]=v;
     refreshCard(id); renderPlan();
-    api("vote",{placeId:id,memberId:state.me.id,value:state.votes[id][state.me.id]??null});
+    const pl=state.places.find(x=>x.id===id)||{};
+    const scale=pl.cat==="住宿"?VOTE_STAY:VOTE_NORMAL;
+    const nv=state.votes[id][state.me.id];
+    api("vote",{placeId:id,memberId:state.me.id,value:nv??null,
+      who:{ place:pl.name||"", member:state.me.name,
+            label:(scale.find(o=>o.v===nv)||{}).label||"" }});
     return;
   }
   const edb=e.target.closest("[data-edit]");
@@ -1571,7 +1625,7 @@ $("#saveBtn").onclick=async()=>{
            shot:shotData,brief:""};
   // 自己丟的預設投「一定要去」；住宿只有兩檔，投「要」
   state.places.unshift(p); state.votes[p.id]={[state.me.id]: pickedCat==="住宿"?1:3};
-  api("addPlace",{place:p,memberId:state.me.id});
+  api("addPlace",{place:p,memberId:state.me.id,who:{member:state.me.name}});
   b.disabled=false; b.textContent="加進清單";
   closeSheets(); renderAll();
   toast(lat!==null?"加好了":"加好了（沒座標，接上後端後會自動補）");
@@ -1605,7 +1659,8 @@ $("#expSave").onclick=()=>{
   if(!(amount>0)) return toast("金額要大於 0");
   if(!pickedSplit.length) return toast("至少分給一個人");
   const x={id:"x"+Date.now().toString(36),title,amount,cur:pickedCur,settled:0,
-           payer:pickedPayer,split:[...pickedSplit]};
+           payer:pickedPayer,split:[...pickedSplit],
+           payerName:nameOf(pickedPayer), splitNames:pickedSplit.map(nameOf)};
   state.expenses.push(x); api("addExpense",{expense:x});
   closeSheets(); renderCost(); toast("記好了");
 };
@@ -1623,12 +1678,12 @@ $("#whoPick").addEventListener("click",e=>{
   enter(MEMBERS.find(x=>x.id===b.dataset.m));
 });
 $("#whoBtn").onclick=()=>{
-  store.set("sgn_me","");
+  store.set("bbteam_me","");
   state.me=null;
   $("#gate").classList.remove("hide");
 };
 function enter(m){
-  state.me=m; store.set("sgn_me",JSON.stringify(m));
+  state.me=m; store.set("bbteam_me",JSON.stringify(m));
   $("#meName").textContent=m.name;
   $("#gate").classList.add("hide");
   renderAll();
@@ -1640,46 +1695,95 @@ function applyLoad(r){
   try{ state.planEdits=r.planEdits?JSON.parse(r.planEdits):{} }catch(_){ state.planEdits={} }
 }
 
+/* ---- 上次載到的資料，開站先拿它墊著 ---- */
+const CACHE_KEY="bbteam_cache";
+function saveCache(r){
+  try{
+    const s=JSON.stringify(r);
+    if(s.length<2000000) store.set(CACHE_KEY,s);   // 太大就不存，免得塞爆瀏覽器
+  }catch(e){}
+}
+function loadCache(){
+  try{ const s=store.get(CACHE_KEY); return s?JSON.parse(s):null }catch(e){ return null }
+}
+
+/* ---- 不需要等網路的部分，載入當下就畫 ---- */
+let sortedOnce=false;
+function paintShell(){
+  state.members=MEMBERS;
+  renderWho();                                    // 六個名字是常數，立刻畫得出來
+  const saved=store.get("bbteam_me");
+  const m=saved?MEMBERS.find(x=>x.id===JSON.parse(saved).id):null;
+  if(m){
+    state.me=m;
+    $("#meName").textContent=m.name;
+    $("#gate").classList.add("hide");
+  }
+}
+function afterData(){
+  ensureOrder();
+  if(!sortedOnce){ state.order.sort((a,b)=>scoreOf(b)-scoreOf(a)); sortedOnce=true; }
+  renderAll();
+}
+
+/* ---- 清理工作搬到畫面出來之後，在背景做 ---- */
+async function maintain(){
+  const jobs=[
+    ["retirePlaces",{names:RETIRED}],
+    ["dedupe",{}],
+    ["seedMissing",{places:seedPlaceList()}]
+  ];
+  let changed=false, allOk=true;
+  for(const [act,pl] of jobs){
+    const res=await api(act,pl);
+    if(!(res&&res.ok)) allOk=false;
+    if(res&&res.n) changed=true;
+  }
+  if(allOk) await api("setConfig",{key:"seedVersion",value:SEED_VERSION});
+  if(changed){
+    const r=await api("load",{});
+    if(r&&r.ok){ applyLoad(r); afterData(); await autoRetire(); await autoClean(); saveCache(snapshot()); }
+  }
+}
+
 async function boot(){
   status(null);
-  if(API_URL){
-    let r=await api("load",{});
+  if(!API_URL){ demoSeed(); afterData(); return; }
 
-    // 第一次連線、表是空的 → 自己把預設地點寫進去，不用使用者動手
-    if(r&&r.ok&&!(r.places||[]).length){
-      const w=await api("seedPlaces",{places:seedPlaceList()});
-      if(w&&w.ok){ await api("setConfig",{key:"seedVersion",value:SEED_VERSION}); r=await api("load",{}); }
-      else console.warn("[初始化寫入失敗]",w);
-    }
+  // 有上次的資料就先畫出來，不要讓人對著空白等
+  const cached=loadCache();
+  if(cached&&(cached.places||[]).length){ applyLoad(cached); afterData(); }
+  veil(true,"資料更新中…");            // 讓人知道畫面上的是舊資料
 
-    if(r&&r.ok&&(r.places||[]).length){
-      // 只有版本對不上才動預設清單，避免每次開站都重複塞
-      if(r.seedVersion!==SEED_VERSION){
-        await api("retirePlaces",{names:RETIRED});
-        const d=await api("dedupe",{});
-        const rm=await api("removePlaces",{names:RETIRED});
-        const add=await api("seedMissing",{places:seedPlaceList()});
-        await api("setConfig",{key:"seedVersion",value:SEED_VERSION});
-        if((d&&d.n)||(rm&&rm.n)||(add&&add.n)){
-          r=await api("load",{});
-          if(d&&d.n) toast(`清掉了 ${d.n} 筆重複的地點`);
-        }
-      }
-      applyLoad(r);
-      backfillCoords();
-    } else {
-      demoSeed();
-      status("還沒連上共用清單，現在看到的是範例資料");
-    }
-  } else demoSeed();
+  let r=await api("load",{});
 
-  ensureOrder(); state.order.sort((a,b)=>scoreOf(b)-scoreOf(a));
-  state.members=MEMBERS;
-  renderWho();
-  const saved=store.get("sgn_me");
-  const m=saved?MEMBERS.find(x=>x.id===JSON.parse(saved).id):null;
-  if(m) enter(m); else renderAll();
+  if(r&&r.ok&&!(r.places||[]).length){          // 第一次連線，表還是空的
+    const w=await api("seedPlaces",{places:seedPlaceList()});
+    if(w&&w.ok){
+      await api("setConfig",{key:"seedVersion",value:SEED_VERSION});
+      r=await api("load",{});
+    } else console.warn("[初始化寫入失敗]",w);
+  }
+
+  if(r&&r.ok&&(r.places||[]).length){
+    applyLoad(r); afterData();
+    const a=await autoRetire();         // 暫代飯店
+    const b=await autoClean();          // 重複的地點
+    if(a||b){ ensureOrder(); renderAll() }
+    saveCache(snapshot());
+    veil(false);
+    backfillCoords();
+    if(r.seedVersion!==SEED_VERSION) maintain();   // 不 await，背景跑
+  } else if(!cached){
+    demoSeed(); afterData(); veil(false);
+    status("還沒連上共用清單，現在看到的是範例資料");
+  } else {
+    veil(false);
+    status("更新失敗，畫面上是上次載到的資料");
+  }
 }
+
+paintShell();   // 先畫，再連線
 boot();
 </script>
 </body>
