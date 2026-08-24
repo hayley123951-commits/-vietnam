@@ -331,6 +331,14 @@ textarea.field{resize:none;line-height:1.5}
 .seg2 button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
 .settled{opacity:.45}
 .settled .ttl{text-decoration:line-through}
+.custrow{
+  display:flex;align-items:center;gap:8px;margin-bottom:6px;
+}
+.custrow span{flex:0 0 50px;font-size:13px}
+.custrow input{
+  flex:1;font-family:var(--mono);font-size:13px;
+  border:0;border-bottom:1px solid var(--line);background:none;padding:4px 0;color:var(--ink);
+}
 .people{display:flex;flex-wrap:wrap;gap:6px}
 .pbtn{border:1px solid var(--line);border-radius:3px;padding:8px 13px;font-size:13px;color:var(--mute);min-height:38px}
 .pbtn[aria-pressed="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
@@ -491,8 +499,20 @@ textarea.field{resize:none;line-height:1.5}
   <div class="hint" id="expTwd"></div>
   <label class="fl lbl">誰付的</label>
   <div class="people" id="payerPick"></div>
+  <label class="fl lbl">怎麼分</label>
+  <div class="seg2" style="margin-bottom:10px">
+    <button id="splitEven" aria-pressed="true">均分</button>
+    <button id="splitCustom" aria-pressed="false">自訂金額</button>
+  </div>
+
   <label class="fl lbl">分給誰</label>
   <div class="people" id="splitPick"></div>
+
+  <div class="hide" id="customBox">
+    <label class="fl lbl">每人各付多少</label>
+    <div id="customAmts"></div>
+    <div class="hint" id="customHint"></div>
+  </div>
   <button class="btn" id="expSave">記起來</button>
   <button class="btn g" id="expCancel">取消</button>
 </div>
@@ -732,6 +752,18 @@ function haversine(a,b){
 const TRIP_CENTER={lat:10.7757,lng:106.7004};
 const MAX_KM=80;
 const farAway=p=>p.lat!=null&&p.lng!=null&&haversine(TRIP_CENTER,{lat:p.lat,lng:p.lng})>MAX_KM;
+
+/* 兩站之間怎麼移動：太近就用走的，遠了才叫車，缺座標就老實說算不出來 */
+function hopInfo(a,b){
+  if(!a||!b||a.lat==null||b.lat==null) return {text:"缺座標，算不出這段距離",ride:null};
+  const km=haversine(a,b);
+  if(km<0.8){                                   // 800 公尺以內，走路比等車快
+    const m=Math.max(3,Math.round(km*1.25/4.5*60));
+    return {text:`走路 約 ${m} 分`,ride:m};
+  }
+  const m=Math.max(7,Math.round(km*1.35/18*60));
+  return {text:`GRAB 約 ${m} 分`,ride:m};
+}
 
 const rideMin=(a,b)=>Math.max(7,Math.round(haversine(a,b)*1.35/18*60));
 
@@ -1183,9 +1215,9 @@ function buildPlan(){
       }
 
       if(!chosen){ stops.push({at,cat:slotCat,slot:i,gap:true}); return }
-      const ride=(last&&last.lat&&chosen.lat)?rideMin(last,chosen):null;
+      const hop=(first&&!hotel) ? {text:"這天的第一站",ride:null} : hopInfo(last,chosen);
       stops.push({at,cat:chosen.cat,slot:i,gap:false,...chosen,
-                  ride:(first&&!hotel)?null:ride});
+                  ride:hop.ride,hop:hop.text});
       first=false; last=chosen;
     });
     return {...day,stops,filled:stops.filter(s=>!s.gap).length,pinned:!!pins};
@@ -1245,7 +1277,7 @@ function renderPlan(){
   }
 
   d.stops.forEach((s,i)=>{
-    if(i>0||d.head||h) html+=`<div class="hop">${s.ride!=null?`GRAB 約 ${s.ride} 分`:"· · ·"}</div>`;
+    if(i>0||d.head||h) html+=`<div class="hop">${esc(s.hop||"這天的第一站")}</div>`;
     const time=`<div class="t"><button class="tbtn" data-time="${s.slot}">${s.at}</button>${
       s.gap?"":`<em>${catOf(s.cat).mins}分</em>`}</div>`;
     if(s.gap){
@@ -1335,9 +1367,18 @@ function settle(){
   const bal={}; MEMBERS.forEach(m=>bal[m.id]=0);
   open_().forEach(e=>{
     if(!e.split||!e.split.length) return;
-    const amt=toTWD(e), share=amt/e.split.length;
+    const amt=toTWD(e);
     if(bal[e.payer]!==undefined) bal[e.payer]+=amt;
-    e.split.forEach(id=>{ if(bal[id]!==undefined) bal[id]-=share });
+    if(e.shares){
+      // 自訂金額：每人各自的數字，換算成同一個幣別
+      const rate = e.cur==="TWD" ? 1 : 1/state.rate;
+      e.split.forEach(id=>{
+        if(bal[id]!==undefined) bal[id]-=(e.shares[id]||0)*rate;
+      });
+    } else {
+      const share=amt/e.split.length;
+      e.split.forEach(id=>{ if(bal[id]!==undefined) bal[id]-=share });
+    }
   });
   const cred=[],debt=[];
   MEMBERS.forEach(m=>{ const v=bal[m.id];
@@ -1362,7 +1403,7 @@ function expRow(e){
   const m=money(e);
   return `<div class="exp ${e.settled?"settled":""}">
     <div class="x"><div class="ttl">${esc(e.title)}</div>
-      <div class="w">${esc(nameOf(e.payer))} 付 · 分 ${e.split.length} 人</div></div>
+      <div class="w">${esc(nameOf(e.payer))} 付 · ${e.shares?"自訂金額":"均分 "+e.split.length+" 人"}</div></div>
     <div class="amt"><b>${m.main}</b>${m.sub?`<span>${m.sub}</span>`:""}</div>
     <button class="rm" data-exp="${e.id}">×</button></div>`;
 }
@@ -1503,7 +1544,7 @@ document.addEventListener("input",e=>{
   }
   if(e.target.id==="expAmt") updateTwdHint();
 });
-let pickedCur="VND";
+let pickedCur="VND", splitMode="even", customAmts={};
 function setCur(c){
   pickedCur=c;
   $("#curVND").setAttribute("aria-pressed",c==="VND");
@@ -1717,8 +1758,47 @@ $("#saveBtn").onclick=async()=>{
 
 /* ---- 新增支出 ---- */
 let pickedPayer="",pickedSplit=[];
+function setSplitMode(mode){
+  splitMode=mode;
+  $("#splitEven").setAttribute("aria-pressed",mode==="even");
+  $("#splitCustom").setAttribute("aria-pressed",mode==="custom");
+  $("#customBox").classList.toggle("hide",mode==="even");
+  if(mode==="custom") renderCustomAmts();
+  updateTwdHint();
+}
+$("#splitEven").onclick=()=>setSplitMode("even");
+$("#splitCustom").onclick=()=>setSplitMode("custom");
+
+function renderCustomAmts(){
+  customAmts={};
+  const total=+$("#expAmt").value||0;
+  const share=pickedSplit.length?Math.round(total/pickedSplit.length):0;
+  $("#customAmts").innerHTML=pickedSplit.map(id=>{
+    customAmts[id]=share;
+    return `<div class="custrow"><span>${esc(nameOf(id))}</span>
+      <input data-cust="${id}" type="number" inputmode="numeric" value="${share||""}"></div>`;
+  }).join("");
+  checkCustomTotal();
+}
+function checkCustomTotal(){
+  const total=+$("#expAmt").value||0;
+  const sum=Object.values(customAmts).reduce((a,b)=>a+b,0);
+  const diff=total-sum;
+  $("#customHint").textContent = diff===0 ? "剛好分完"
+    : (diff>0 ? `還差 ${diff.toLocaleString()}` : `多了 ${Math.abs(diff).toLocaleString()}`);
+  $("#customHint").className = diff===0 ? "hint o" : "hint w";
+}
+document.addEventListener("input",e=>{
+  if(e.target.dataset.cust){
+    customAmts[e.target.dataset.cust]=+e.target.value||0;
+    checkCustomTotal();
+    return;
+  }
+  if(e.target.id==="expAmt"&&splitMode==="custom") renderCustomAmts();
+});
+
 function openCost(){
-  pickedPayer=state.me.id; pickedSplit=MEMBERS.map(m=>m.id); setCur("VND");
+  pickedPayer=state.me.id; pickedSplit=MEMBERS.map(m=>m.id); setCur("VND"); setSplitMode("even");
   $("#payerPick").innerHTML=MEMBERS.map(m=>
     `<button class="pbtn" data-payer="${m.id}" aria-pressed="${m.id===pickedPayer}">${esc(m.name)}</button>`).join("");
   $("#splitPick").innerHTML=MEMBERS.map(m=>
@@ -1735,6 +1815,7 @@ $("#splitPick").addEventListener("click",e=>{
   const id=b.dataset.split;
   pickedSplit = pickedSplit.includes(id) ? pickedSplit.filter(x=>x!==id) : [...pickedSplit,id];
   b.setAttribute("aria-pressed",pickedSplit.includes(id));
+  if(splitMode==="custom") renderCustomAmts();
   updateTwdHint();
 });
 $("#expSave").onclick=()=>{
@@ -1742,8 +1823,9 @@ $("#expSave").onclick=()=>{
   if(!title) return toast("寫一下項目");
   if(!(amount>0)) return toast("金額要大於 0");
   if(!pickedSplit.length) return toast("至少分給一個人");
+  const shares = splitMode==="custom" ? {...customAmts} : null;
   const x={id:"x"+Date.now().toString(36),title,amount,cur:pickedCur,settled:0,
-           payer:pickedPayer,split:[...pickedSplit],
+           payer:pickedPayer,split:[...pickedSplit],shares:shares,
            payerName:nameOf(pickedPayer), splitNames:pickedSplit.map(nameOf)};
   state.expenses.push(x); api("addExpense",{expense:x});
   closeSheets(); renderCost(); toast("記好了");
