@@ -1665,7 +1665,14 @@ document.addEventListener("input",e=>{
     ? `總計 TWD ${(per*rm*nt).toLocaleString()}　一人 TWD ${Math.round(per*rm*nt/MEMBERS.length).toLocaleString()}`
     : "";
 });
-let urlTimer=null;
+/* 短網址（maps.app.goo.gl）前端讀不出任何東西，必須靠後端跟著轉址展開。
+   手機分享常帶追蹤參數（?g_st=ic），先清掉再送。 */
+function cleanUrl(u){
+  return u.replace(/[?&]g_st=[^&#]*/g,"").replace(/[?&]entry=[^&#]*/g,"")
+          .replace(/[?&]g_ep=[^&#]*/g,"").replace(/\?$/,"");
+}
+
+let urlTimer=null, resolving=false;
 $("#urlIn").addEventListener("input",e=>{
   const u=e.target.value.trim(), hint=$("#urlHint");
   clearTimeout(urlTimer);
@@ -1673,33 +1680,31 @@ $("#urlIn").addEventListener("input",e=>{
 
   parsed=parseMapsUrl(u);
   if(parsed.name&&!$("#nameIn").value) $("#nameIn").value=parsed.name;
-  showUrlHint();
 
-  // 名稱或座標任一缺漏，就請後端跟著轉址展開一次
-  if(API_URL && (parsed.lat===null || !parsed.name)){
-    hint.className="hint"; hint.textContent="正在展開這個連結…";
-    urlTimer=setTimeout(async()=>{
-      const r=await api("resolve",{url:u});
-      if(r&&r.ok){
-        if(parsed.lat===null && r.lat!=null){ parsed.lat=r.lat; parsed.lng=r.lng }
-        if(!parsed.name && r.name){ parsed.name=r.name; if(!$("#nameIn").value) $("#nameIn").value=r.name }
-      }
-      showUrlHint(r);
-    },600);
+  if(parsed.lat!==null && parsed.name){
+    hint.className="hint o"; hint.textContent=`已取得名稱與座標`; return;
   }
+  if(parsed.short || (!parsed.lat && !parsed.name)){
+    hint.className="hint"; hint.textContent="短網址，按「加進清單」時會自動展開。";
+    // 背景先試一次，成功就提前填上；失敗也不要緊，儲存時會再試
+    if(API_URL && !resolving){
+      resolving=true;
+      urlTimer=setTimeout(async()=>{
+        const r=await api("resolve",{url:cleanUrl(u)});
+        resolving=false;
+        if(r&&r.ok){
+          if(r.lat!=null){ parsed.lat=r.lat; parsed.lng=r.lng }
+          if(r.name){ parsed.name=r.name; if(!$("#nameIn").value) $("#nameIn").value=r.name }
+          if(parsed.lat!==null) hint.textContent="已取得座標，按加進清單就好。";
+        }
+      },400);
+    }
+    return;
+  }
+  if(parsed.lat!==null){ hint.className="hint o"; hint.textContent=`已取得座標`; return }
+  if(parsed.name){ hint.className="hint o"; hint.textContent=`已取得名稱：${parsed.name}`; return }
+  hint.className="hint"; hint.textContent="直接打名字也可以。";
 });
-function showUrlHint(r){
-  const hint=$("#urlHint"), got=[];
-  if(parsed.name) got.push("名稱");
-  if(parsed.lat!==null) got.push(`座標 ${parsed.lat.toFixed(4)}, ${parsed.lng.toFixed(4)}`);
-  if(got.length===2){ hint.className="hint o"; hint.textContent="已取得 "+got.join("、"); return }
-  if(got.length===1){ hint.className="hint o"; hint.textContent="已取得"+got[0]+"。另一項讀不到，可以自己補。"; return }
-  if(parsed.short&&!API_URL){ hint.className="hint w"; hint.textContent="短網址要接上後端才展得開，先手動打名字。"; return }
-  hint.className="hint w";
-  hint.textContent = r===undefined
-    ? "這個網址讀不出東西，直接打名字也可以。"
-    : "這個網址展不開。試試在 Google 地圖上按「分享」複製連結，那種最好讀。";
-}
 $("#shotIn").addEventListener("change",e=>{
   const f=e.target.files[0]; if(!f) return;
   const img=new Image(), fr=new FileReader();
@@ -1718,7 +1723,8 @@ $("#shotIn").addEventListener("change",e=>{
 });
 $("#saveBtn").onclick=async()=>{
   const name=$("#nameIn").value.trim();
-  if(!name) return toast("至少要有名字");
+  const url0=$("#urlIn").value.trim();
+  if(!name&&!url0) return toast("名字或連結至少要有一個");
   if(!pickedCat) return toast("選一下類型");
   const b=$("#saveBtn"); b.disabled=true;
 
@@ -1727,8 +1733,9 @@ $("#saveBtn").onclick=async()=>{
     b.textContent="儲存中…";
     const url=$("#urlIn").value.trim();
     let lat=parsed.lat??null, lng=parsed.lng??null;
-    if(url&&url!==p.url&&lat===null&&API_URL){
-      const r=await api("resolve",{url}); if(r&&r.ok){lat=r.lat;lng=r.lng}
+    if(url&&(lat===null||(url!==p.url))&&API_URL){
+      const r=await post("resolve",{url:cleanUrl(url)});
+      if(r&&r.ok){ if(lat===null&&r.lat!=null){lat=r.lat;lng=r.lng} }
     }
     if(p.name!==name){ p.brief=""; delete briefFailed[p.id] }   // 換了名字就重新產介紹
     Object.assign(p,{name,cat:pickedCat,url,lat,lng,
@@ -1740,11 +1747,20 @@ $("#saveBtn").onclick=async()=>{
     return;
   }
 
-  b.textContent="加進去…";
+  b.textContent="展開連結中…";
   let lat=parsed.lat??null, lng=parsed.lng??null;
+  let resolvedName=parsed.name||"";
   const url=$("#urlIn").value.trim();
-  if(url&&lat===null&&API_URL){ const r=await api("resolve",{url}); if(r&&r.ok){lat=r.lat;lng=r.lng} }
-  const p={id:"p"+Date.now().toString(36),name,cat:pickedCat,lat,lng,url,
+  if(url&&(lat===null||!resolvedName)&&API_URL){
+    const r=await post("resolve",{url:cleanUrl(url)});   // 用 POST，比 JSONP 穩
+    if(r&&r.ok){
+      if(lat===null&&r.lat!=null){ lat=r.lat; lng=r.lng }
+      if(!resolvedName&&r.name) resolvedName=r.name;
+    }
+  }
+  b.textContent="加進去…";
+  const finalName = name || resolvedName || url;
+  const p={id:"p"+Date.now().toString(36),name:finalName,cat:pickedCat,lat,lng,url,
            by:state.me.name,note:$("#noteIn").value.trim(),hours:$("#hoursIn").value.trim(),link:collectLinks(),
            perNight:+$("#perNightIn").value||"", rooms:+$("#roomsIn").value||"", nights:+$("#nightsIn").value||"",
            shot:shotData,brief:""};
