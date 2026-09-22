@@ -263,9 +263,6 @@ input,select,textarea{font-family:inherit;font-size:16px;color:inherit}
 .bal b{font-family:var(--mono);font-weight:600;font-size:13px}
 .bal .pos{color:var(--blue)}
 .tx{margin-top:14px;padding-top:13px;border-top:1px solid var(--line)}
-.tx .row{display:flex;align-items:center;gap:9px;padding:7px 0;font-size:13.5px}
-.tx .row b{font-family:var(--mono);font-weight:600;font-size:13px;margin-left:auto}
-.tx .arw{color:var(--sky);font-family:var(--mono)}
 
 .nav{
   position:fixed;left:0;right:0;bottom:0;z-index:40;
@@ -329,7 +326,28 @@ textarea.field{resize:none;line-height:1.5}
 .seg2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .seg2 button{border:1px solid var(--line);border-radius:3px;padding:10px;font-size:12.5px;color:var(--mute);min-height:42px}
 .seg2 button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
-.settled{opacity:.45}
+.settled{opacity:.4}
+.settled .ttl{text-decoration:line-through}
+.exp .acts{display:flex;gap:2px;flex:0 0 auto;flex-direction:column;align-items:center}
+.exp .acts button{width:28px;height:28px;border-radius:50%;font-size:13px;line-height:28px;text-align:center}
+.ck{color:var(--mute);border:1px solid var(--line) !important}
+.ck.on{background:var(--blue);color:#fff;border-color:var(--blue) !important}
+.dl{color:var(--line);font-size:15px}
+.txrow{
+  display:flex;align-items:center;gap:9px;padding:9px 0;font-size:13.5px;
+  border-bottom:1px dashed var(--line-l);
+}
+.txrow:last-of-type{border-bottom:0}
+.txrow b{font-family:var(--mono);font-weight:600;font-size:13px;margin-left:auto}
+.txrow .arw{color:var(--sky);font-family:var(--mono)}
+.txrow .paid{
+  font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+  border:1px solid var(--line);border-radius:3px;padding:5px 10px;
+  color:var(--mute);margin-left:6px;min-height:30px;
+}
+.txrow .paid.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.txrow.done{opacity:.4}
+.txrow.done b{text-decoration:line-through}
 .settled .ttl{text-decoration:line-through}
 .custrow{
   display:flex;align-items:center;gap:8px;margin-bottom:6px;
@@ -586,7 +604,8 @@ const store={
   set(k,v){ try{ localStorage.setItem(k,v) }catch(e){ mem[k]=v } }
 };
 
-let state={me:null,members:[],places:[],votes:{},expenses:[],hotel:null,rate:800,planEdits:{},order:[]};
+let state={me:null,members:[],places:[],votes:{},expenses:[],hotel:null,rate:800,planEdits:{},order:[],
+           paidTx:[]};   // [{from,to}] 已標記「已還」的還款
 
 /* 清單順序固定下來，投票不會讓卡片跳位；要重排才按按鈕 */
 function ensureOrder(){
@@ -908,7 +927,8 @@ function findDupes(){
 function snapshot(){
   return { ok:true, members:MEMBERS, places:state.places, votes:state.votes,
            expenses:state.expenses, hotel:state.hotel, rate:state.rate,
-           planEdits:JSON.stringify(state.planEdits), seedVersion:SEED_VERSION };
+           planEdits:JSON.stringify(state.planEdits), paidTx:JSON.stringify(state.paidTx),
+           seedVersion:SEED_VERSION };
 }
 
 /* 我先前暫代用的飯店，每次載完就順手清掉 */
@@ -1405,7 +1425,10 @@ function expRow(e){
     <div class="x"><div class="ttl">${esc(e.title)}</div>
       <div class="w">${esc(nameOf(e.payer))} 付 · ${e.shares?"自訂金額":"均分 "+e.split.length+" 人"}</div></div>
     <div class="amt"><b>${m.main}</b>${m.sub?`<span>${m.sub}</span>`:""}</div>
-    <button class="rm" data-exp="${e.id}">×</button></div>`;
+    <div class="acts">
+      <button class="ck ${e.settled?"on":""}" data-ck="${e.id}" title="${e.settled?"取消結清":"標記已結清"}">✓</button>
+      <button class="dl" data-exp="${e.id}" title="刪掉">×</button>
+    </div></div>`;
 }
 function renderCost(){
   const opens=open_(), done=state.expenses.filter(e=>e.settled);
@@ -1426,11 +1449,19 @@ function renderCost(){
       html+=`<div class="bal"><span>${esc(m.name)}</span>
         <b class="${v>=0?"pos":""}">${v>=0?"應收":"應付"} NT$ ${Math.round(Math.abs(v)).toLocaleString()}</b></div>`;
     });
-    html += tx.length ? `<div class="tx"><span class="lbl">最少筆數還錢</span>
-        ${tx.map(t=>`<div class="row"><span>${esc(nameOf(t.from))}</span><span class="arw">→</span>
-        <span>${esc(nameOf(t.to))}</span><b>NT$ ${Math.round(t.amt).toLocaleString()}</b></div>`).join("")}</div>`
+    const isPaid=(f,t)=>state.paidTx.some(x=>x.from===f&&x.to===t);
+    const allPaid=tx.length&&tx.every(t=>isPaid(t.from,t.to));
+    html += tx.length ? `<div class="tx"><span class="lbl">最少筆數還錢${allPaid?" · 全部還完了":""}</span>
+        ${tx.map(t=>{
+          const done=isPaid(t.from,t.to);
+          return `<div class="txrow ${done?"done":""}">
+            <span>${esc(nameOf(t.from))}</span><span class="arw">→</span>
+            <span>${esc(nameOf(t.to))}</span>
+            <b>NT$ ${Math.round(t.amt).toLocaleString()}</b>
+            <button class="paid ${done?"on":""}" data-paid="${t.from}|${t.to}">${done?"已還":"未還"}</button>
+          </div>`;}).join("")}</div>`
       : `<div class="tx"><span class="lbl">已經打平了</span></div>`;
-    html+=`<button class="btn" data-act="settleAll" style="margin-top:16px">大家還完了 · 全部結清</button>`;
+    if(allPaid) html+=`<button class="btn" data-act="settleAll" style="margin-top:16px">全部結清，歸檔這些帳目</button>`;
     html+=`</div>`;
   }
 
@@ -1468,7 +1499,9 @@ document.addEventListener("click",async e=>{
     if(act.dataset.act==="settleAll"){
       if(confirm("確定大家都還完錢了嗎？這些帳會移到已結清。")){
         state.expenses.forEach(x=>x.settled=1);
-        api("settleAll",{}); renderCost(); toast("結清了");
+        state.paidTx=[];
+        api("settleAll",{}); api("setConfig",{key:"paidTx",value:"[]"});
+        renderCost(); toast("結清了");
       }
     }
     return;
@@ -1530,8 +1563,23 @@ document.addEventListener("click",async e=>{
     if(state.hotel===id) state.hotel=null;
     api("deletePlace",{id}); renderAll(); toast("刪掉了"); return;
   }
+  const ck=e.target.closest("[data-ck]");
+  if(ck){
+    const x=state.expenses.find(x=>x.id===ck.dataset.ck);
+    if(x){ x.settled=x.settled?0:1; api("settleExpense",{id:x.id,settled:x.settled}); renderCost() }
+    return;
+  }
+  const paid=e.target.closest("[data-paid]");
+  if(paid){
+    const [from,to]=paid.dataset.paid.split("|");
+    const i=state.paidTx.findIndex(x=>x.from===from&&x.to===to);
+    if(i>=0) state.paidTx.splice(i,1); else state.paidTx.push({from,to});
+    api("setConfig",{key:"paidTx",value:JSON.stringify(state.paidTx)});
+    renderCost(); return;
+  }
   const rm=e.target.closest("[data-exp]");
   if(rm){
+    if(!confirm("確定要刪掉這筆帳嗎？")) return;
     state.expenses=state.expenses.filter(x=>x.id!==rm.dataset.exp);
     api("deleteExpense",{id:rm.dataset.exp}); renderCost(); return;
   }
@@ -1875,6 +1923,7 @@ function applyLoad(r){
   state.members=MEMBERS; state.places=r.places||[]; state.votes=r.votes||{};
   state.expenses=r.expenses||[]; state.hotel=r.hotel||null; state.rate=r.rate||800;
   try{ state.planEdits=r.planEdits?JSON.parse(r.planEdits):{} }catch(_){ state.planEdits={} }
+  try{ state.paidTx=r.paidTx?JSON.parse(r.paidTx):[] }catch(_){ state.paidTx=[] }
 }
 
 /* ---- 上次載到的資料，開站先拿它墊著 ---- */
