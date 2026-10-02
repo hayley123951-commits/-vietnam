@@ -185,6 +185,24 @@ input,select,textarea{font-family:inherit;font-size:16px;color:inherit}
   position:absolute;top:6px;right:6px;width:28px;height:28px;
   color:var(--line);font-size:15px;line-height:1;
 }
+.addstop{padding:12px 0 6px;text-align:center}
+.addbtn{
+  border:1px dashed var(--sky) !important;border-radius:3px;padding:10px 18px;
+  font-size:13px;color:var(--blue);background:none;min-height:42px;
+}
+.addbtn:active{background:var(--tint)}
+.addpanel{
+  padding:10px 0 4px;display:flex;flex-wrap:wrap;gap:6px;
+}
+.addtitle{font-size:11px;color:var(--mute);width:100%;margin-bottom:2px}
+.pick{display:flex;flex-wrap:wrap;gap:6px;padding:4px 0 8px}
+.pickbtn{
+  border:1px solid var(--sky) !important;border-radius:3px;padding:8px 11px;
+  font-size:12.5px;color:var(--blue-d);background:var(--tint);
+  display:flex;align-items:center;gap:6px;min-height:38px;
+}
+.pickbtn em{font-family:var(--mono);font-style:normal;font-size:10px;color:var(--mute)}
+.pickbtn:active{background:var(--blue);color:#fff;border-color:var(--blue) !important}
 .grip{
   position:absolute;right:6px;bottom:4px;width:30px;height:30px;
   color:var(--line);font-size:13px;line-height:30px;text-align:center;
@@ -1217,9 +1235,14 @@ function buildPlan(){
     let last=hotel, first=true;
     const stops=[];
 
-    day.slots.forEach(([,slotCat],i)=>{
-      if(isRemoved(di,i)) return;
-      const at=hhmm(times[i]);
+    // 額外手動加的時段
+    const extra=(state.planEdits[di]||{}).extraStops||[];
+    const allSlots=[...day.slots];
+    extra.forEach(x=>allSlots.push(["",x.cat]));
+
+    allSlots.forEach(([,slotCat],i)=>{
+      if(i<day.slots.length&&isRemoved(di,i)) return;
+      const at = i<times.length ? hhmm(times[i]) : "";
       let chosen=null;
 
       if(pins){                                   // 這天已經手動排過
@@ -1242,7 +1265,8 @@ function buildPlan(){
                   ride:hop.ride,hop:hop.text});
       first=false; last=chosen;
     });
-    return {...day,stops,filled:stops.filter(s=>!s.gap).length,pinned:!!pins};
+    return {...day,stops,filled:stops.filter(s=>!s.gap).length,pinned:!!pins,
+            hasExtra:extra.length>0};
   });
 }
 
@@ -1267,6 +1291,11 @@ function movePin(di,from,to){
 }
 
 /* 排定的時段落在營業時間外就提醒 */
+/* 這個地點有沒有被排進任何一天 */
+function usedInPlan(id){
+  return buildPlan().some(d=>d.stops.some(s=>!s.gap&&s.id===id));
+}
+
 function hoursWarn(s){
   const hh=parseHours(s.hours); if(!hh) return "";
   const at=toMin(s.at), dur=catOf(s.cat).mins;
@@ -1303,8 +1332,15 @@ function renderPlan(){
     const time=`<div class="t"><button class="tbtn" data-time="${s.slot}">${s.at}</button>${
       s.gap?"":`<em>${catOf(s.cat).mins}分</em>`}</div>`;
     if(s.gap){
+      // 該類型裡還沒被排進行程的地點
+      const avail=state.places.filter(p=>p.cat===s.cat&&!usedInPlan(p.id))
+                               .sort((a,b)=>scoreOf(b.id)-scoreOf(a.id));
       html+=`<div class="stub gap" data-slot="${s.slot}">${time}
-        <div class="n">還缺一個「${s.cat}」</div><div class="m">丟一個進來就會補上</div>
+        <div class="n">還缺一個「${s.cat}」</div>
+        ${avail.length?`<div class="pick">${avail.map(a=>
+          `<button class="pickbtn" data-assign="${s.slot}|${a.id}">
+            ${esc(a.name)}<em>${scoreOf(a.id)} 分</em></button>`).join("")}</div>`
+        :`<div class="m">清單裡沒有這個類型的地點</div>`}
         <button class="xbtn" data-rm="${s.slot}">×</button></div>`;
       return;
     }
@@ -1329,7 +1365,7 @@ function renderPlan(){
   const ed=state.planEdits[planDay];
   if(ed&&(ed.pins||ed.removed?.length||Object.keys(ed.times||{}).length)){
     const bits=[];
-    if(ed.pins) bits.push("手動排過順序");
+    if(ed.pins||ed.extraStops?.length) bits.push("手動排過順序");
     if(Object.keys(ed.times||{}).length) bits.push("改過時間");
     if(ed.removed?.length) bits.push(`移除了 ${ed.removed.length} 格`);
     html+=`<div class="planedit"><span>${bits.join(" · ")}</span>
@@ -1509,6 +1545,53 @@ document.addEventListener("click",async e=>{
         renderCost(); toast("結清了");
       }
     }
+    return;
+  }
+  const addday=e.target.closest("[data-addday]");
+  if(addday){
+    const di=+addday.dataset.addday;
+    const btn=addday;
+    // 已經展開就收起來
+    const exist=btn.parentElement.querySelector(".addpanel");
+    if(exist){ exist.remove(); return }
+    // 所有還沒排進行程的地點（不限類型）
+    const used=new Set();
+    buildPlan().forEach(d=>d.stops.forEach(s=>{ if(!s.gap) used.add(s.id) }));
+    const avail=state.places.filter(p=>p.cat!=="住宿"&&!used.has(p.id))
+                             .sort((a,b)=>scoreOf(b.id)-scoreOf(a.id));
+    if(!avail.length){ toast("所有地點都已經排進行程了"); return }
+    const panel=document.createElement("div");
+    panel.className="addpanel";
+    panel.innerHTML=`<div class="addtitle">選一個加進 ${TRIP.days[di].date}</div>`+
+      avail.map(a=>`<button class="pickbtn" data-addplace="${di}|${a.id}">
+        <span>${esc(a.name)}</span><em>${a.cat} · ${scoreOf(a.id)} 分</em></button>`).join("");
+    btn.parentElement.appendChild(panel);
+    return;
+  }
+  const addplace=e.target.closest("[data-addplace]");
+  if(addplace){
+    const [diStr,placeId]=addplace.dataset.addplace.split("|");
+    const di=+diStr;
+    const place=state.places.find(p=>p.id===placeId);
+    if(!place) return;
+    // 在那天最後面新增一個時段
+    const pins=freezePins(di);
+    pins.push(placeId);
+    // 也要在 slots 裡面加一格，不然 buildPlan 不會讀到
+    const ed=state.planEdits[di]=state.planEdits[di]||{};
+    ed.extraStops=ed.extraStops||[];
+    ed.extraStops.push({id:placeId,cat:place.cat});
+    saveEdits(); renderPlan();
+    toast(`${place.name} 排進去了`);
+    return;
+  }
+  const assign=e.target.closest("[data-assign]");
+  if(assign){
+    const [slotStr,placeId]=assign.dataset.assign.split("|");
+    const slot=+slotStr;
+    const pins=freezePins(planDay);
+    pins[slot]=placeId;
+    saveEdits(); renderPlan();
     return;
   }
   const md=e.target.closest("[data-mday]");
