@@ -1355,6 +1355,11 @@ function renderPlan(){
       <div class="grip" data-grip="${s.slot}">⠿</div></div>`;
   });
 
+  // + 加一站
+  html+=`<div class="addstop">
+    <button class="addbtn" data-addday="${planDay}">+ 加一站</button>
+  </div>`;
+
   if(h&&!d.tail) html+=`<div class="hop">收工回飯店</div>
     <div class="stub base"><div class="t">—</div><div class="n">${esc(h.name)}</div><div class="m">回房</div></div>`;
   if(d.tail) html+=`<div class="hop">回程反向 · 塞車抓 50 分</div>
